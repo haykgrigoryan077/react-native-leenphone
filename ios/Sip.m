@@ -9,6 +9,7 @@ RCT_EXTERN_METHOD(initialise:(RCTPromiseResolveBlock)resolve
 RCT_EXTERN_METHOD(login:(NSString *)username
                   withPassword:(NSString *)password
                   withDomain:(NSString *)domain
+                  withTransport (NSInteger *)transport
                   withResolver:(RCTPromiseResolveBlock)resolve
                   withRejecter:(RCTPromiseRejectBlock)reject)
 
