@@ -90,15 +90,15 @@ export async function sendDtmf(dtmf: string): Promise<void> {
   return Sip.sendDtmf(dtmf)
 }
 
-type AudioDevice = 'bluetooth' | 'phone' | 'loudspeaker'
+export type AudioDevice = 'bluetooth' | 'phone' | 'loudspeaker'
 
-interface AudioDevices {
+export interface AudioDevices {
   options: { [device in AudioDevice]: boolean }
   current: AudioDevice
 }
 
 export function useAudioDevices(
-  callback: (device: AudioDevices) => Promise<void>
+  callback: (device: AudioDevices) => void
 ): void {
   const scanAudioDevices = React.useCallback(
     () => Sip.scanAudioDevices().then(callback),
@@ -120,20 +120,16 @@ export function useAudioDevices(
   }, [scanAudioDevices])
 }
 
-export async function bluetoothAudio() {
-  return Sip.bluetoothAudio()
-}
-export async function loudAudio() {
-  return Sip.loudAudio()
-}
-export async function phoneAudio() {
-  return Sip.phoneAudio()
+export async function setAudioDevice(device: AudioDevice) {
+  if (device === 'bluetooth') return Sip.bluetoothAudio()
+  if (device === 'loudspeaker') return Sip.loudAudio()
+  if (device === 'phone') return Sip.phoneAudio()
 }
 
-export async function micEnabled() {
+export async function getMicStatus(): Promise<boolean> {
   return Sip.micEnabled()
 }
 
-export async function toggleMute() {
+export async function toggleMute(): Promise<void> {
   return Sip.toggleMute()
 }

@@ -1,11 +1,17 @@
-import React from 'react'
-import Dialpad from './dialpad'
+import React, { useEffect, useState } from 'react'
 
 import {
-  useSIP,
+  initialise,
+  unregister,
+  login,
+  call,
+  sendDtmf,
+  hangup,
   useCall,
   useAudioDevices,
-  useMicrophone,
+  setAudioDevice,
+  toggleMute,
+  AudioDevices,
 } from 'react-native-sip-phone'
 import { StyleSheet, View, Button, TextInput } from 'react-native'
 
@@ -25,7 +31,13 @@ function Login(props: LoginProps) {
   const [password, setPassword] = React.useState('')
   const [username, setUsername] = React.useState('')
   const { setLoggedIn } = props
-  const { login } = useSIP()
+
+  useEffect(() => {
+    initialise().then()
+    return () => {
+      unregister().then()
+    }
+  }, [])
 
   function handleLogin() {
     login(username, password, domain)
@@ -74,15 +86,23 @@ function Login(props: LoginProps) {
 }
 
 function PhoneCall() {
-  const [audioDevices, setAudioDevice] = useAudioDevices()
-  const [micEnabled, toggleMicEnabled] = useMicrophone()
+  const [micEnabled, toggleMicEnabled] = useState(true)
   const [callState, setCallState] = React.useState<CallState>('initial')
   const [remoteUri, setRemoteUri] = React.useState('')
+  const [dtmf, setDtmf] = React.useState('')
+  const [audioDevices, _setAudioDevice] = React.useState<AudioDevices | null>(
+    null
+  )
 
   const canCall = remoteUri && callState === 'initial'
   const canHangUp = ['ringing', 'in-progress'].includes(callState)
 
-  const { call, hangup, sendDtmf } = useCall({
+  useAudioDevices((devices) => {
+    console.log(devices)
+    _setAudioDevice(devices)
+  })
+
+  useCall({
     onCallRequested: () => setCallState('requested'),
     onCallRinging: () => setCallState('ringing'),
     onCallConnected: () => setCallState('in-progress'),
@@ -93,7 +113,7 @@ function PhoneCall() {
   })
 
   function outboundCall() {
-    call(remoteUri)
+    call(remoteUri).then()
   }
 
   return (
@@ -106,9 +126,30 @@ function PhoneCall() {
         textContentType="emailAddress"
         value={remoteUri}
       />
+      <TextInput
+        autoCapitalize="none"
+        onChangeText={setDtmf}
+        placeholder="CallerID"
+        style={styles.input}
+        textContentType="telephoneNumber"
+        value={dtmf}
+      />
       <View style={styles.callButtonContainer}>
         <View style={styles.callButton}>
-          <Button onPress={outboundCall} title="Call" disabled={!canCall} />
+          <Button
+            onPress={outboundCall}
+            title="Call with remote uri"
+            disabled={!canCall}
+          />
+        </View>
+        <View style={styles.callButton}>
+          <Button
+            onPress={() => {
+              sendDtmf(dtmf).then()
+            }}
+            title="Call with dtmf"
+            disabled={!canCall}
+          />
         </View>
         <View style={styles.callButton}>
           <Button onPress={hangup} title="Hang up" disabled={!canHangUp} />
@@ -119,30 +160,33 @@ function PhoneCall() {
           <Button
             onPress={() => setAudioDevice('bluetooth')}
             title="Bluetooth"
-            disabled={!audioDevices.options.bluetooth}
+            disabled={!audioDevices?.options.bluetooth}
           />
         </View>
         <View style={styles.audioButton}>
           <Button
             onPress={() => setAudioDevice('loudspeaker')}
             title="Loudspeaker"
-            disabled={!audioDevices.options.loudspeaker}
+            disabled={!audioDevices?.options.loudspeaker}
           />
         </View>
         <View style={styles.audioButton}>
           <Button
             onPress={() => setAudioDevice('phone')}
             title="Phone"
-            disabled={!audioDevices.options.phone}
+            disabled={!audioDevices?.options.phone}
           />
         </View>
         <View style={styles.audioButton}>
           <Button
-            onPress={toggleMicEnabled}
+            onPress={() => {
+              toggleMute().then(() => {
+                toggleMicEnabled(!micEnabled)
+              })
+            }}
             title={micEnabled ? 'Mute' : 'Unmute'}
           />
         </View>
-        <Dialpad sendDtmf={sendDtmf} />
       </View>
     </View>
   )
@@ -190,5 +234,6 @@ const styles = StyleSheet.create({
     marginLeft: 'auto',
     marginRight: 'auto',
     width: 300,
+    padding: 12,
   },
 })
