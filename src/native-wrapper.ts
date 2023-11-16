@@ -8,7 +8,7 @@ const LINKING_ERROR =
   '- You rebuilt the app after installing the package\n' +
   '- You are not using Expo managed workflow\n'
 
-export const Sip = NativeModules.Sip
+const Sip = NativeModules.Sip
   ? NativeModules.Sip
   : new Proxy(
       {},
@@ -48,8 +48,12 @@ interface Callbacks {
   onAuthenticationError?: (username: string) => void
 }
 
-export function multiply(a: number, b: number): Promise<number> {
-  return Sip.multiply(a, b)
+export async function initialise(): Promise<void> {
+  return Sip.initialise()
+}
+
+export async function unregister(): Promise<void> {
+  return Sip.unregister
 }
 
 export function login(
@@ -60,28 +64,7 @@ export function login(
   return Sip.login(username, password, domain)
 }
 
-export type DtmfChar =
-  | '0'
-  | '1'
-  | '2'
-  | '3'
-  | '4'
-  | '5'
-  | '6'
-  | '7'
-  | '8'
-  | '9'
-  | '0'
-  | '*'
-  | '#'
-
-type SipCall = {
-  call: (remoteUri: string) => Promise<void>
-  hangup: () => Promise<void>
-  sendDtmf: (dtmf: DtmfChar) => Promise<void>
-}
-
-export function useCall(callbacks: Callbacks = {}): SipCall {
+export function useCall(callbacks: Callbacks = {}): void {
   React.useEffect(() => {
     console.log('Initialising phone')
     const eventEmitter = new NativeEventEmitter(Sip)
@@ -93,12 +76,18 @@ export function useCall(callbacks: Callbacks = {}): SipCall {
     )
     return () => eventListeners.forEach((listener) => listener.remove())
   }, [callbacks])
+}
 
-  return {
-    call: (remoteUri: string) => Sip.outgoingCall(remoteUri),
-    hangup: () => Sip.hangUp(),
-    sendDtmf: (dtmf: DtmfChar) => Sip.sendDtmf(dtmf),
-  }
+export async function call(remoteUri: string): Promise<void> {
+  return Sip.outgoingCall(remoteUri)
+}
+
+export async function hangup(): Promise<void> {
+  return Sip.hangUp()
+}
+
+export async function sendDtmf(dtmf: string): Promise<void> {
+  return Sip.sendDtmf(dtmf)
 }
 
 type AudioDevice = 'bluetooth' | 'phone' | 'loudspeaker'
@@ -108,33 +97,12 @@ interface AudioDevices {
   current: AudioDevice
 }
 
-const initialDevices: AudioDevices = {
-  current: 'phone',
-  options: {
-    bluetooth: false,
-    loudspeaker: false,
-    phone: true,
-  },
-}
-
-export function useAudioDevices(): [
-  AudioDevices,
-  (device: AudioDevice) => Promise<boolean>
-] {
-  const [current, setCurrent] = React.useState<AudioDevice>(
-    initialDevices.current
-  )
-  const [options, setOptions] = React.useState<{
-    [device in AudioDevice]: boolean
-  }>(initialDevices.options)
-
+export function useAudioDevices(
+  callback: (device: AudioDevices) => Promise<void>
+): void {
   const scanAudioDevices = React.useCallback(
-    () =>
-      Sip.scanAudioDevices().then((audioDevices: AudioDevices) => {
-        setCurrent(audioDevices.current)
-        setOptions(audioDevices.options)
-      }),
-    []
+    () => Sip.scanAudioDevices().then(callback),
+    [callback]
   )
 
   React.useEffect(() => {
@@ -150,42 +118,22 @@ export function useAudioDevices(): [
   React.useEffect(() => {
     scanAudioDevices()
   }, [scanAudioDevices])
-
-  const switchAudio = React.useCallback(
-    async (device: AudioDevice) => {
-      if (!options[device]) {
-        return false
-      }
-
-      let result: boolean
-      if (device === 'bluetooth') {
-        result = await Sip.bluetoothAudio()
-      } else if (device === 'loudspeaker') {
-        result = await Sip.loudAudio()
-      } else if (device === 'phone') {
-        result = await Sip.phoneAudio()
-      } else {
-        result = false
-      }
-
-      if (result) {
-        scanAudioDevices()
-      }
-
-      return result
-    },
-    [options, scanAudioDevices]
-  )
-
-  return [{ current, options }, switchAudio]
 }
 
-export function useMicrophone(): [boolean, () => Promise<boolean>] {
-  const [micEnabled, setMicEnabled] = React.useState<boolean>(false)
+export async function bluetoothAudio() {
+  return Sip.bluetoothAudio()
+}
+export async function loudAudio() {
+  return Sip.loudAudio()
+}
+export async function phoneAudio() {
+  return Sip.phoneAudio()
+}
 
-  React.useEffect(() => {
-    Sip.micEnabled().then(setMicEnabled)
-  }, [])
+export async function micEnabled() {
+  return Sip.micEnabled()
+}
 
-  return [micEnabled, async () => Sip.toggleMute()]
+export async function toggleMute() {
+  return Sip.toggleMute()
 }
