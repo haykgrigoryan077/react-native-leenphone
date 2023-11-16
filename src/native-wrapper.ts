@@ -19,6 +19,13 @@ const Sip = NativeModules.Sip
       }
     )
 
+enum TransportType {
+  Udp = 0,
+  Tcp = 1,
+  Tls = 2,
+  Dtls = 3
+}
+
 interface Callbacks {
   // First state an outgoing call will go through
   onConnectionRequested?: () => void
@@ -59,9 +66,10 @@ export async function unregister(): Promise<void> {
 export function login(
   username: string,
   password: string,
-  domain: string
+  domain: string,
+  transport: TransportType
 ): Promise<void> {
-  return Sip.login(username, password, domain)
+  return Sip.login(username, password, domain, transport)
 }
 
 export function useCall(callbacks: Callbacks = {}): void {

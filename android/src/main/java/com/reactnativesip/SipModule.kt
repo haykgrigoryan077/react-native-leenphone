@@ -158,8 +158,11 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
   }
 
   @ReactMethod
-  fun login(username: String, password: String, domain: String, promise: Promise) {
-    val transportType = TransportType.Tls
+  fun login(username: String, password: String, domain: String, transportType: Int, promise: Promise) {
+    var _transportType = TransportType.Tcp
+    if (transport == 0) { _transport = TransportType.Udp }
+    if (transport == 2) { _transport = TransportType.Tls }
+    if (transport == 3) { _transport = TransportType.Dtls }
 
     // To configure a SIP account, we need an Account object and an AuthInfo object
     // The first one is how to connect to the proxy server, the second one stores the credentials
@@ -182,7 +185,7 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     // We also need to configure where the proxy server is located
     val address = Factory.instance().createAddress("sip:$domain")
     // We use the Address object to easily set the transport protocol
-    address?.transport = transportType
+    address?.transport = _transportType
     accountParams.serverAddress = address
     // And we ensure the account will start the registration process
     accountParams.registerEnabled = true
