@@ -19,11 +19,11 @@ const Sip = NativeModules.Sip
       }
     )
 
-enum TransportType {
+export enum TransportType {
   Udp = 0,
   Tcp = 1,
   Tls = 2,
-  Dtls = 3
+  Dtls = 3,
 }
 
 interface Callbacks {

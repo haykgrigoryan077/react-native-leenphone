@@ -12,6 +12,7 @@ import {
   setAudioDevice,
   toggleMute,
   AudioDevices,
+  TransportType,
 } from 'react-native-sip-phone'
 import { StyleSheet, View, Button, TextInput } from 'react-native'
 
@@ -40,7 +41,7 @@ function Login(props: LoginProps) {
   }, [])
 
   function handleLogin() {
-    login(username, password, domain)
+    login(username, password, domain, TransportType.Tcp)
       .then(() => setLoggedIn(true))
       .catch((e) => {
         console.log(e)
