@@ -134,5 +134,5 @@ dependencies {
   // noinspection GradleDynamicVersion
   api 'com.facebook.react:react-native:+'
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
-  implementation "org.linphone:linphone-sdk-android:5.0+"
+  implementation "org.linphone:linphone-sdk-android:5.2.109"
 }
