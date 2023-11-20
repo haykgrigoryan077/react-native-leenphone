@@ -42,9 +42,9 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     core.clearAllAuthInfo()
   }
 
-  private fun sendEvent(eventName: String) {
+  private fun sendEvent(eventName: String, body: Any? = null) {
     reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-    .emit(eventName, null)
+    .emit(eventName, body)
   }
 
 
@@ -147,9 +147,26 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
           Call.State.Error -> {
             sendEvent("CallError")
           }
+          Call.State.End -> {
+            sendEvent("CallEnd")
+          }
+          Call.State.PushIncomingReceived -> {
+            sendEvent("CallPushIncomingReceived")
+          }
           else -> {
           }
         }
+      }
+
+      override fun onAccountRegistrationStateChanged(core: Core, account: Account, state: RegistrationState?, message: String) {
+        val body: Map<String, *> = mapOf(
+          "core" to core,
+          "account" to account,
+          "state" to state,
+          "message" to message,
+        )
+
+        sendEvent("AccountRegistrationStateChanged", body)
       }
     }
 
@@ -160,9 +177,9 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
   @ReactMethod
   fun login(username: String, password: String, domain: String, transportType: Int, promise: Promise) {
     var _transportType = TransportType.Tcp
-    if (transport == 0) { _transport = TransportType.Udp }
-    if (transport == 2) { _transport = TransportType.Tls }
-    if (transport == 3) { _transport = TransportType.Dtls }
+    if (transportType == 0) { _transportType = TransportType.Udp }
+    if (transportType == 2) { _transportType = TransportType.Tls }
+    if (transportType == 3) { _transportType = TransportType.Dtls }
 
     // To configure a SIP account, we need an Account object and an AuthInfo object
     // The first one is how to connect to the proxy server, the second one stores the credentials

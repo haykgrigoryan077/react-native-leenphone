@@ -13,6 +13,24 @@ class Sip: RCTEventEmitter {
     private var loudSpeaker: AudioDevice?
     private var microphone: AudioDevice?
 
+    var isCallIncoming : Bool = false
+    var isCallRunning : Bool = false
+
+    /*------------ Callkit tutorial related variables ---------------*/
+    let incomingCallName = "Incoming call example"
+    var mCall : Call?
+    var mProviderDelegate : CallKitProviderDelegate!
+    var mCallAlreadyStopped : Bool = false;
+
+    func stopCall() {
+        // Call has been terminated by any side
+
+        // Report to CallKit that the call is over, if the terminate action was initiated by other end of the call
+        if (self.isCallRunning) {
+            self.mProviderDelegate.stopCall()
+        }
+    }
+
     @objc func delete() {
         // To completely remove an Account
         if let account = mCore.defaultAccount {
@@ -25,8 +43,8 @@ class Sip: RCTEventEmitter {
             mCore.clearAllAuthInfo()
         }}
 
-    @objc func sendEvent( eventName: String ) {
-        self.sendEvent(withName:eventName, body:"");
+    @objc func sendEvent( eventName: String, body: NSDictionary? = nil ) {
+        self.sendEvent(withName:eventName, body:body);
     }
 
     @objc(initialise:withRejecter:)
@@ -35,6 +53,9 @@ class Sip: RCTEventEmitter {
             LoggingService.Instance.logLevel = LogLevel.Debug
 
             try? mCore = Factory.Instance.createCore(configPath: "", factoryConfigPath: "", systemContext: nil)
+            mProviderDelegate = CallKitProviderDelegate(context: self)
+            mCore.callkitEnabled = true
+            mCore.pushNotificationEnabled = true
             try? mCore.start()
 
             // Create a Core listener to listen for the callback we need
@@ -50,7 +71,14 @@ class Sip: RCTEventEmitter {
                   case .IncomingReceived:
                       // Immediately hang up when we receive a call. There's nothing inherently wrong with this
                       // but we don't need it right now, so better to leave it deactivated.
-                      try! call.terminate()
+                      // If app is in foreground, it's likely that we will receive the SIP invite before the Push notification
+                      if (!self.isCallIncoming) {
+                          self.mCall = call
+                          self.isCallIncoming = true
+                          self.mProviderDelegate.incomingCall()
+                      }
+                      self.sendEvent(eventName: "IncomingReceived")
+
                    case .OutgoingInit:
                       // First state an outgoing call will go through
                       self.sendEvent(eventName: "ConnectionRequested")
@@ -61,6 +89,9 @@ class Sip: RCTEventEmitter {
                       // Once remote accepts, ringing will commence (180 response)
                       self.sendEvent(eventName: "CallRinging")
                 case .Connected:
+                      self.isCallIncoming = false
+                      self.isCallRunning = true
+
                       self.sendEvent(eventName: "CallConnected")
                 case .StreamsRunning:
                       // This state indicates the call is active.
@@ -79,14 +110,34 @@ class Sip: RCTEventEmitter {
                       self.sendEvent(eventName: "CallUpdatedByRemote")
                   case .Released:
                       self.sendEvent(eventName: "CallReleased")
+                      self.stopCall()
                   case .Error:
                       self.sendEvent(eventName: "CallError")
+                      self.stopCall()
+                  case .End:
+                      self.sendEvent(eventName: "CallEnd")
+                      self.stopCall()
+                  case .PushIncomingReceived:
+                      self.mCall = call
+                      self.isCallIncoming = true
+                      self.mProviderDelegate.incomingCall()
+                      self.sendEvent(eventName: "CallPushIncomingReceived")
                 default:
                       NSLog("")
                   }
                 },
                 onAudioDevicesListUpdated: { (core: Core) in
                     self.sendEvent(eventName: "AudioDevicesChanged")
+                },
+                onAccountRegistrationStateChanged: {(
+                    core: Core,
+                    account: Account,
+                    state: RegistrationState,
+                    message: String
+                ) in
+                    let body: NSDictionary = ["core": core, "account": account, "state": state, "message": message]
+                    self.sendEvent(eventName: "AccountRegistrationStateChanged", body:body )
+
                 })
             mCore.addDelegate(delegate: mRegistrationDelegate)
             resolve(true)
@@ -125,6 +176,8 @@ class Sip: RCTEventEmitter {
             try accountParams.setServeraddress(newValue: address)
             // And we ensure the account will start the registration process
             accountParams.registerEnabled = true
+            accountParams.pushNotificationAllowed = true
+            accountParams.pushNotificationConfig?.provider = "apns.dev"
 
             // Now that our AccountParams is configured, we can create the Account object
             let account = try mCore.createAccount(params: accountParams)
@@ -158,7 +211,8 @@ class Sip: RCTEventEmitter {
 
     @objc
     override func supportedEvents() -> [String]! {
-        return ["ConnectionRequested", "CallRequested", "CallRinging", "CallConnected", "CallStreamsRunning", "CallPaused", "CallPausedByRemote", "CallUpdating", "CallUpdatedByRemote", "CallReleased", "CallError", "AudioDevicesChanged"]
+        return ["ConnectionRequested", "CallRequested", "CallRinging", "CallConnected", "CallStreamsRunning", "CallPaused", "CallPausedByRemote", "CallUpdating", "CallUpdatedByRemote", "CallReleased", "CallError", "AudioDevicesChanged",
+                "CallEnd", "CallPushIncomingReceived", "AccountRegistrationStateChanged", "IncomingReceived"]
     }
 
     @objc(unregister:withRejecter:)
@@ -188,10 +242,11 @@ class Sip: RCTEventEmitter {
             if (mCore.callsNb == 0) { return }
 
             // If the call state isn't paused, we can get it using core.currentCall
-            let coreCall = (mCore.currentCall != nil) ? mCore.currentCall : mCore.calls[0]
+            // If the call state isn't paused, we can get it using core.currentCall
+            self.mCall = (mCore.currentCall != nil) ? mCore.currentCall : mCore.calls[0]
 
             // Terminating a call is quite simple
-            if let call = coreCall {
+            if let call = self.mCall {
                 try call.terminate()
             } else {
                 reject("No call", "No call to terminate", nil)
@@ -326,6 +381,13 @@ class Sip: RCTEventEmitter {
     func toggleMute(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
         mCore.micEnabled = !mCore.micEnabled
         resolve(mCore.micEnabled)
+    }
+
+    func configureAudioSession() {
+        mCore.configureAudioSession()
+    }
+    func activateAudioSession(actived: Bool) {
+        mCore.activateAudioSession(actived: actived)
     }
 
 }
