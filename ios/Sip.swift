@@ -135,7 +135,31 @@ class Sip: RCTEventEmitter {
                     state: RegistrationState,
                     message: String
                 ) in
-                    let body: NSDictionary = ["core": core, "account": account, "state": state, "message": message]
+                    let coreMap: NSDictionary = [
+                        "accountCreatorUrl": core.accountCreatorUrl,
+                        "adaptiveRateAlgorithm": core.adaptiveRateAlgorithm,
+                        "httpProxyHost": core.httpProxyHost,
+                        "identity": core.identity,
+                        "stunServer": core.stunServer,
+                        "mediaDevice": core.mediaDevice,
+                        "primaryContact": core.primaryContact,
+                        "remoteRingbackTone": core.remoteRingbackTone,
+                        "provisioningUri": core.provisioningUri,
+                        "rootCa": core.rootCa,
+                        "tlsCert": core.tlsCert,
+                        "tlsCertPath": core.tlsCertPath,
+                        "tlsKey": core.tlsKey,
+                        "tlsKeyPath": core.tlsKeyPath,
+                    ]
+
+                    let accountMap: NSDictionary = [
+                        "contactAddressDomain": account.contactAddress?.domain as Any,
+                        "contactAddressUsername": account.contactAddress?.username as Any,
+                        "contactAddressDisplayName": account.contactAddress?.displayName as Any,
+                        "contactAddressPassword": account.contactAddress?.password as Any,
+                    ]
+
+                    let body: NSDictionary = ["core": coreMap, "account": accountMap, "state": String(describing:state), "message": message]
                     self.sendEvent(eventName: "AccountRegistrationStateChanged", body:body )
 
                 })

@@ -159,14 +159,36 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
       }
 
       override fun onAccountRegistrationStateChanged(core: Core, account: Account, state: RegistrationState?, message: String) {
-        val body: Map<String, *> = mapOf(
-          "core" to core,
-          "account" to account,
-          "state" to state,
-          "message" to message,
-        )
+        val map = Arguments.createMap()
 
-        sendEvent("AccountRegistrationStateChanged", body)
+        val coreMap = Arguments.createMap()
+        coreMap.putString("accountCreatorUrl", core.accountCreatorUrl)
+        coreMap.putString("adaptiveRateAlgorithm", core.adaptiveRateAlgorithm)
+        coreMap.putString("httpProxyHost", core.httpProxyHost)
+        coreMap.putString("identity", core.identity)
+        coreMap.putString("stunServer", core.stunServer)
+        coreMap.putString("mediaDevice", core.mediaDevice)
+        coreMap.putString("primaryContact", core.primaryContact)
+        coreMap.putString("remoteRingbackTone", core.remoteRingbackTone)
+        coreMap.putString("provisioningUri", core.provisioningUri)
+        coreMap.putString("rootCa", core.rootCa)
+        coreMap.putString("tlsCert", core.tlsCert)
+        coreMap.putString("tlsCertPath", core.tlsCertPath)
+        coreMap.putString("tlsKey", core.tlsKey)
+        coreMap.putString("tlsKeyPath", core.tlsKeyPath)
+        map.putMap("core", coreMap)
+
+        val accountMap = Arguments.createMap()
+        accountMap.putString("contactAddressDomain", account.contactAddress?.domain)
+        accountMap.putString("contactAddressUsername", account.contactAddress?.username)
+        accountMap.putString("contactAddressDisplayName", account.contactAddress?.displayName)
+        accountMap.putString("contactAddressPassword", account.contactAddress?.password)
+        map.putMap("account", accountMap)
+
+        map.putString("state", state.toString())
+        map.putString("message", message)
+
+        sendEvent("AccountRegistrationStateChanged", map)
       }
     }
 
@@ -189,7 +211,7 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     // ha1 is set to null as we are using the clear text password. Upon first register, the hash will be computed automatically.
     // The realm will be determined automatically from the first register, as well as the algorithm
     val authInfo =
-    Factory.instance().createAuthInfo(username, null, password, null, null, domain, null)
+      Factory.instance().createAuthInfo(username, null, password, null, null, domain, null)
 
     // Account object replaces deprecated ProxyConfig object
     // Account object is configured through an AccountParams object that we can obtain from the Core
@@ -205,7 +227,7 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     address?.transport = _transportType
     accountParams.serverAddress = address
     // And we ensure the account will start the registration process
-    accountParams.registerEnabled = true
+    accountParams.isRegisterEnabled = true
 
     // Now that our AccountParams is configured, we can create the Account object
     val account = core.createAccount(accountParams)
@@ -253,7 +275,7 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
 
   @ReactMethod
   fun micEnabled(promise: Promise) {
-    promise.resolve(core.micEnabled())
+    promise.resolve(core.isMicEnabled)
   }
 
   @ReactMethod
@@ -355,8 +377,8 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
 
   @ReactMethod
   fun toggleMute(promise: Promise) {
-    val micEnabled = core.micEnabled()
-    core.enableMic(!micEnabled)
+    val micEnabled = core.isMicEnabled
+    core.isMicEnabled = !micEnabled
     promise.resolve(!micEnabled)
   }
 
@@ -369,7 +391,7 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     // Returned params object is const, so to make changes we first need to clone it
     val params = account.params.clone()
 
-    params.registerEnabled = false
+    params.isRegisterEnabled = false
     account.params = params
     core.removeAccount(account)
     core.clearAllAuthInfo()
