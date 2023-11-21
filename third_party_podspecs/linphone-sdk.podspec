@@ -1,5 +1,5 @@
 require "json"
-reactVersion = JSON.parse(File.read(File.join(__dir__, "..", "react-native", "package.json")))["version"]
+reactVersion = JSON.parse(File.read(File.join(__dir__, "..", "..", "react-native", "package.json")))["version"]
 
 boost_compiler_flags = '-Wno-documentation'
 
@@ -11,6 +11,8 @@ react_native_common_dir_absolute = File.join(react_native_node_modules_dir, 'rea
 react_native_common_dir_relative = Pathname.new(react_native_common_dir_absolute).relative_path_from(pods_root).to_s
 
 folly_flags = '-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 -DRNVERSION=' + rnVersion
+
+folly_compiler_flags = folly_flags + ' ' + '-Wno-comma -Wno-shorten-64-to-32'
 
 Pod::Spec.new do |s|
 

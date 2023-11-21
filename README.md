@@ -13,7 +13,7 @@ npm install react-native-sip-phone
 1.
     in `ios/Podfile`add:
     ```rb
-    pod 'linphone-sdk', :podspec => '../node_modules/third_party_podspecs/linphone-sdk.podspec'
+    pod 'linphone-sdk', :podspec => '../node_modules/react-native-sip-phone/third_party_podspecs/linphone-sdk.podspec'
     pod 'react-native-sip-phone', :path => '../node_modules/react-native-sip-phone'
     ```
 2.
