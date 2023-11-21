@@ -8,15 +8,48 @@ Make SIP calls from react-native using Linphone SDK
 npm install react-native-sip-phone
 ```
 
+### IOS
+
+1.
+    in `ios/Podfile`add:
+    ```rb
+    pod 'linphone-sdk', :podspec => '../node_modules/third_party_podspecs/linphone-sdk.podspec'
+    pod 'react-native-sip-phone', :path => '../node_modules/react-native-sip-phone'
+    ```
+2.
+    ```shell
+    cd ios && pod install
+    ```
+
+### Android
+1.
+    in `android/app/build.gradle` add:
+    ```gradle
+    repositories {
+      maven {
+        url "https://linphone.org/maven_repository"
+      }
+    }
+
+    dependencies {
+      ...
+      implementation 'org.linphone:linphone-sdk-android:5.2.110'
+    }
+   ```
+2.
+    in `android/build` modify minSdkVersion to 23:
+    ```gradle
+    buildscript {
+       ext {
+          ...
+          minSdkVersion = 23
+          ...
+       }
+    }
+    ```
 ## Usage
 
-```js
-import { multiply } from "react-native-sip-phone";
 
-// ...
-
-const result = await multiply(3, 7);
-```
 
 ## Contributing
 
