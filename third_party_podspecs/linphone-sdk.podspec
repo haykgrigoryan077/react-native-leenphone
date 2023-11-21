@@ -12,6 +12,8 @@ react_native_common_dir_relative = Pathname.new(react_native_common_dir_absolute
 
 folly_flags = '-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 -DRNVERSION=' + rnVersion
 
+folly_compiler_flags = folly_flags + ' ' + '-Wno-comma -Wno-shorten-64-to-32'
+
 Pod::Spec.new do |s|
 
   s.name         = "linphone-sdk"
