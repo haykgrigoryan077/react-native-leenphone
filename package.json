@@ -1,6 +1,6 @@
 {
   "name": "@hoang6799/react-native-sip-phone",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Make SIP calls from react-native using Linphone SDK",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
