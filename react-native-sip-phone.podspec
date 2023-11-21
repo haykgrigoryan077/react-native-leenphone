@@ -2,7 +2,7 @@ require "json"
 
 package = JSON.parse(File.read(File.join(__dir__, "package.json")))
 
-reactVersion = JSON.parse(File.read(File.join(__dir__, "..", "react-native", "package.json")))["version"]
+reactVersion = JSON.parse(File.read(File.join(__dir__, "..", "..", "react-native", "package.json")))["version"]
 
 boost_compiler_flags = '-Wno-documentation'
 
