@@ -2,7 +2,7 @@ require "json"
 
 package = JSON.parse(File.read(File.join(__dir__, "package.json")))
 
-reactVersion = JSON.parse(File.read(File.join(__dir__, "..", "..", "react-native", "package.json")))["version"]
+reactVersion = JSON.parse(File.read(File.join(__dir__, "..", "react-native", "package.json")))["version"]
 
 boost_compiler_flags = '-Wno-documentation'
 
@@ -18,7 +18,7 @@ folly_flags = '-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 -DRNVERSI
 folly_compiler_flags = folly_flags + ' ' + '-Wno-comma -Wno-shorten-64-to-32'
 
 Pod::Spec.new do |s|
-  s.name         = "react-native-sip-phone"
+  s.name         = "react-native-leenphone"
   s.version      = package["version"]
   s.summary      = package["description"]
   s.homepage     = package["homepage"]
@@ -26,7 +26,7 @@ Pod::Spec.new do |s|
   s.authors      = package["author"]
 
   s.platforms    = { :ios => "9.0" }
-  s.source       = { :git => "https://github.com/jc578271/react-native-sip-phone", :tag => "#{s.version}" }
+  s.source       = { :git => "https://github.com/jc578271/react-native-leenphone", :tag => "#{s.version}" }
 
   s.source_files = "ios/**/*.{h,m,mm,swift}"
 

@@ -8,7 +8,7 @@ platform :ios, '11.0'
 target 'SipExample' do
   config = use_native_modules!
 
-  pod 'react-native-sip-phone', :path => '../..'
+  pod 'react-native-leenphone', :path => '../..'
   pod 'linphone-sdk', :podspec => "../linphone-sdk.podspec"
 
   use_react_native!(

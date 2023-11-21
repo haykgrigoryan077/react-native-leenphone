@@ -13,7 +13,7 @@
     "android",
     "ios",
     "cpp",
-    "react-native-sip-phone.podspec",
+    "react-native-leenphone.podspec",
     "!lib/typescript/example",
     "!android/build",
     "!ios/build",
@@ -37,13 +37,13 @@
     "ios",
     "android"
   ],
-  "repository": "https://github.com/jc578271/react-native-sip-phone",
-  "author": "Nigel Sotelo <nigel@woonivers.com> (https://github.com/Woonivers)",
+  "repository": "https://github.com/jc578271/react-native-leenphone",
+  "author": "jc578271",
   "license": "GPL-3.0-or-later",
   "bugs": {
-    "url": "https://github.com/jc578271/react-native-sip-phone/issues"
+    "url": "https://github.com/jc578271/react-native-leenphone/issues"
   },
-  "homepage": "https://github.com/jc578271/react-native-sip-phone#readme",
+  "homepage": "https://github.com/jc578271/react-native-leenphone#readme",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },

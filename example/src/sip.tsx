@@ -13,7 +13,7 @@ import {
   toggleMute,
   AudioDevices,
   TransportType,
-} from 'react-native-sip-phone'
+} from 'react-native-leenphone'
 import { StyleSheet, View, Button, TextInput } from 'react-native'
 
 type CallState =

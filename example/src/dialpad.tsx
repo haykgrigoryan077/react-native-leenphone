@@ -1,6 +1,6 @@
 import React from 'react'
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
-import type { DtmfChar } from 'react-native-sip-phone'
+import type { DtmfChar } from 'react-native-leenphone'
 
 interface DialpadProps {
   sendDtmf: (dtmf: DtmfChar) => Promise<void>

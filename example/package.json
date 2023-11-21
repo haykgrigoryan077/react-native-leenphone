@@ -1,6 +1,6 @@
 {
-  "name": "react-native-sip-phone-example",
-  "description": "Example app for react-native-sip-phone",
+  "name": "react-native-leenphone-example",
+  "description": "Example app for react-native-leenphone",
   "version": "0.0.1",
   "private": true,
   "scripts": {

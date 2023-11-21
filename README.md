@@ -1,11 +1,11 @@
-# react-native-sip-phone
+# react-native-leenphone
 
 Make SIP calls from react-native using Linphone SDK
 
 ## Installation
 
 ```sh
-npm install @hoang6799/react-native-sip-phone
+npm install react-native-leenphone
 ```
 
 ### IOS
@@ -13,8 +13,8 @@ npm install @hoang6799/react-native-sip-phone
 1.
     in `ios/Podfile`add:
     ```rb
-    pod 'linphone-sdk', :podspec => '../node_modules/@hoang6799/react-native-sip-phone/third_party_podspecs/linphone-sdk.podspec'
-    pod 'react-native-sip-phone', :path => '../node_modules/@hoang6799/react-native-sip-phone'
+    pod 'linphone-sdk', :podspec => '../node_modules/react-native-leenphone/third_party_podspecs/linphone-sdk.podspec'
+    pod 'react-native-leenphone', :path => '../node_modules/react-native-leenphone'
     ```
 2.
     ```shell
