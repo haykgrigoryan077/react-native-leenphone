@@ -60,7 +60,7 @@ export async function initialise(): Promise<void> {
 }
 
 export async function unregister(): Promise<void> {
-  return Sip.unregister;
+  return Sip.unregister();
 }
 
 export function login(

@@ -1,9 +1,8 @@
 import React from 'react'
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
-import type { DtmfChar } from 'react-native-leenphone'
 
 interface DialpadProps {
-  sendDtmf: (dtmf: DtmfChar) => Promise<void>
+  sendDtmf: (dtmf: any) => Promise<void>
 }
 
 export default function Dialpad(props: DialpadProps): JSX.Element {
@@ -20,7 +19,7 @@ export default function Dialpad(props: DialpadProps): JSX.Element {
           {row.map((n) => (
             <TouchableOpacity
               key={n}
-              onPress={() => sendDtmf(n as DtmfChar)}
+              onPress={() => sendDtmf(n as any)}
               style={styles.roundButton}
             >
               <Text>{n}</Text>
