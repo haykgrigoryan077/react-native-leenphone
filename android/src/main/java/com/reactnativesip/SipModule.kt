@@ -398,4 +398,25 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
 
     promise.resolve(true)
   }
+
+  fun holdCall(promise: Promise) {
+    val call = core.currentCall ?: core.calls.getOrNull(0)
+    if (call != null) {
+      val ok = call.pause()
+      promise.resolve(ok)
+    } else {
+      promise.reject("no_call", "No active call to hold")
+    }
+  }
+
+  @ReactMethod
+  fun unholdCall(promise: Promise) {
+    val call = core.currentCall ?: core.calls.getOrNull(0)
+    if (call != null) {
+      val ok = call.resume()
+      promise.resolve(ok)
+    } else {
+      promise.reject("no_call", "No active call to unhold")
+    }
+  }
 }
