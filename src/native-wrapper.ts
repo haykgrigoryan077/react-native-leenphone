@@ -98,13 +98,13 @@ export async function sendDtmf(dtmf: string): Promise<void> {
   return Sip.sendDtmf(dtmf);
 }
 
-export async function holdCall(): Promise<boolean> {
-  return Sip.holdCall();
-}
+// export async function holdCall(): Promise<boolean> {
+//   return Sip.holdCall();
+// }
 
-export async function unholdCall(): Promise<boolean> {
-  return Sip.unholdCall();
-}
+// export async function unholdCall(): Promise<boolean> {
+//   return Sip.unholdCall();
+// }
 
 export type AudioDevice = 'bluetooth' | 'phone' | 'loudspeaker';
 

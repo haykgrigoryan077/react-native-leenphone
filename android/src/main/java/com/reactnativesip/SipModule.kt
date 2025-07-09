@@ -4,7 +4,7 @@ import android.util.Log
 import com.facebook.react.bridge.*
 
 import com.facebook.react.modules.core.DeviceEventManagerModule
-import org.linphone.core.*
+// import org.linphone.core.*
 
 
 class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
@@ -399,24 +399,24 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     promise.resolve(true)
   }
 
-  fun holdCall(promise: Promise) {
-    val call = core.currentCall ?: core.calls.getOrNull(0)
-    if (call != null) {
-      val ok = call.pause()
-      promise.resolve(ok)
-    } else {
-      promise.reject("no_call", "No active call to hold")
-    }
-  }
+  // fun holdCall(promise: Promise) {
+  //   val call = core.currentCall ?: core.calls.getOrNull(0)
+  //   if (call != null) {
+  //     val ok = call.pause()
+  //     promise.resolve(ok)
+  //   } else {
+  //     promise.reject("no_call", "No active call to hold")
+  //   }
+  // }
 
-  @ReactMethod
-  fun unholdCall(promise: Promise) {
-    val call = core.currentCall ?: core.calls.getOrNull(0)
-    if (call != null) {
-      val ok = call.resume()
-      promise.resolve(ok)
-    } else {
-      promise.reject("no_call", "No active call to unhold")
-    }
-  }
+  // @ReactMethod
+  // fun unholdCall(promise: Promise) {
+  //   val call = core.currentCall ?: core.calls.getOrNull(0)
+  //   if (call != null) {
+  //     val ok = call.resume()
+  //     promise.resolve(ok)
+  //   } else {
+  //     promise.reject("no_call", "No active call to unhold")
+  //   }
+  // }
 }
