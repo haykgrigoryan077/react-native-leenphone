@@ -61,6 +61,10 @@ class Sip: RCTEventEmitter {
             LoggingService.Instance.logLevel = LogLevel.Debug
 
             try? mCore = Factory.Instance.createCore(configPath: "", factoryConfigPath: "", systemContext: nil)
+            
+            // FIX: Disable local ringback tone to prevent mediastreamer crash on call cancel
+            mCore.remoteRingbackTone = nil
+            
             mProviderDelegate = CallKitProviderDelegate(context: self)
             mCore.callkitEnabled = true
             mCore.pushNotificationEnabled = true
@@ -77,42 +81,32 @@ class Sip: RCTEventEmitter {
                 ) in
                   switch (state) {
                   case .IncomingReceived:
-                      // Immediately hang up when we receive a call. There's nothing inherently wrong with this
-                      // but we don't need it right now, so better to leave it deactivated.
-                      // If app is in foreground, it's likely that we will receive the SIP invite before the Push notification
                       if (!self.isCallIncoming) {
                           self.mCall = call
                           self.isCallIncoming = true
+                          self.mCallAlreadyStopped = false // FIX: Reset flag for new call
                           self.mProviderDelegate.incomingCall()
                       }
                       self.sendEvent(eventName: "IncomingReceived")
 
                    case .OutgoingInit:
-                      // First state an outgoing call will go through
+                      self.mCallAlreadyStopped = false // FIX: Reset flag for new call
                       self.sendEvent(eventName: "ConnectionRequested")
                 case .OutgoingProgress:
-                      // First state an outgoing call will go through
                       self.sendEvent(eventName: "CallRequested")
                   case .OutgoingRinging:
-                      // Once remote accepts, ringing will commence (180 response)
                       self.sendEvent(eventName: "CallRinging")
                 case .Connected:
                       self.isCallIncoming = false
                       self.isCallRunning = true
-
                       self.sendEvent(eventName: "CallConnected")
                 case .StreamsRunning:
-                      // This state indicates the call is active.
-                      // You may reach this state multiple times, for example after a pause/resume
-                      // or after the ICE negotiation completes
-                      // Wait for the call to be connected before allowing a call update
                       self.sendEvent(eventName: "CallStreamsRunning")
                 case .Paused:
                       self.sendEvent(eventName: "CallPaused")
                 case .PausedByRemote:
                       self.sendEvent(eventName: "CallPausedByRemote")
                   case .Updating:
-                      // When we request a call update, for example when toggling video
                       self.sendEvent(eventName: "CallUpdating")
                   case .UpdatedByRemote:
                       self.sendEvent(eventName: "CallUpdatedByRemote")
@@ -126,9 +120,12 @@ class Sip: RCTEventEmitter {
                       self.sendEvent(eventName: "CallEnd")
                       self.stopCall()
                   case .PushIncomingReceived:
-                      self.mCall = call
-                      self.isCallIncoming = true
-                      self.mProviderDelegate.incomingCall()
+                      if (!self.isCallIncoming) {
+                          self.mCall = call
+                          self.isCallIncoming = true
+                          self.mCallAlreadyStopped = false // FIX: Reset flag for new call
+                          self.mProviderDelegate.incomingCall()
+                      }
                       self.sendEvent(eventName: "CallPushIncomingReceived")
                 default:
                       NSLog("")
@@ -183,47 +180,29 @@ class Sip: RCTEventEmitter {
             if (transport == 2) { _transport = TransportType.Tls }
             if (transport == 3) { _transport = TransportType.Dtls }
 
-            // To configure a SIP account, we need an Account object and an AuthInfo object
-            // The first one is how to connect to the proxy server, the second one stores the credentials
-
-            // The auth info can be created from the Factory as it's only a data class
-            // userID is set to null as it's the same as the username in our case
-            // ha1 is set to null as we are using the clear text password. Upon first register, the hash will be computed automatically.
-            // The realm will be determined automatically from the first register, as well as the algorithm
             let authInfo = try Factory.Instance.createAuthInfo(username: username, userid: "", passwd: password, ha1: "", realm: "", domain: domain)
-
-            // Account object replaces deprecated ProxyConfig object
-            // Account object is configured through an AccountParams object that we can obtain from the Core
             let accountParams = try mCore.createAccountParams()
-
-            // A SIP account is identified by an identity address that we can construct from the username and domain
             let identity = try Factory.Instance.createAddress(addr: String("sip:" + username + "@" + domain))
             try! accountParams.setIdentityaddress(newValue: identity)
 
-            // We also need to configure where the proxy server is located
             let address = try Factory.Instance.createAddress(addr: String("sip:" + domain))
-
-            // We use the Address object to easily set the transport protocol
             try address.setTransport(newValue: _transport)
             try accountParams.setServeraddress(newValue: address)
-            // And we ensure the account will start the registration process
+
             accountParams.registerEnabled = true
             accountParams.pushNotificationAllowed = true
             accountParams.pushNotificationConfig?.provider = "apns.dev"
-
-            // Now that our AccountParams is configured, we can create the Account object
+            
             let account = try mCore.createAccount(params: accountParams)
-
-            // Now let's add our objects to the Core
+            
             mCore.addAuthInfo(info: authInfo)
             try mCore.addAccount(account: account)
-
-            // Also set the newly added account as default
+            
             mCore.defaultAccount = account
 
             resolve(nil)
-
-        } catch { NSLog(error.localizedDescription)
+        } catch { 
+            NSLog(error.localizedDescription)
             reject("Login error", "Could not log in", error)
         }
     }
@@ -233,11 +212,9 @@ class Sip: RCTEventEmitter {
         if let mic = self.bluetoothMic {
             mCore.inputAudioDevice = mic
         }
-
         if let speaker = self.bluetoothSpeaker {
             mCore.outputAudioDevice = speaker
         }
-
         resolve(true)
     }
 
@@ -250,17 +227,10 @@ class Sip: RCTEventEmitter {
     @objc(unregister:withRejecter:)
     func unregister(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock)
     {
-        // Here we will disable the registration of our Account
         if let account = mCore.defaultAccount {
-
             let params = account.params
-            // Returned params object is const, so to make changes we first need to clone it
             let clonedParams = params?.clone()
-
-            // Now let's make our changes
             clonedParams?.registerEnabled = false
-
-            // And apply them
             account.params = clonedParams
             mCore.removeAccount(account: account)
             mCore.clearAllAuthInfo()
@@ -272,12 +242,7 @@ class Sip: RCTEventEmitter {
         NSLog("Trying to hang up")
         do {
             if (mCore.callsNb == 0) { return }
-
-            // If the call state isn't paused, we can get it using core.currentCall
-            // If the call state isn't paused, we can get it using core.currentCall
             self.mCall = (mCore.currentCall != nil) ? mCore.currentCall : mCore.calls[0]
-
-            // Terminating a call is quite simple
             if let call = self.mCall {
                 try call.terminate()
             } else {
@@ -286,7 +251,6 @@ class Sip: RCTEventEmitter {
         } catch {
             NSLog(error.localizedDescription)
             reject("Call termination failed", "Call termination failed", error)
-
         }
     }
 
@@ -297,11 +261,9 @@ class Sip: RCTEventEmitter {
         } else if let mic = self.microphone {
             mCore.inputAudioDevice = mic
         }
-
         if let speaker = loudSpeaker {
             mCore.outputAudioDevice = speaker
         }
-
         resolve(true)
     }
 
@@ -313,24 +275,13 @@ class Sip: RCTEventEmitter {
     @objc(outgoingCall:withResolver:withRejecter:)
     func outgoingCall(recipient: String, resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
         do {
-            // As for everything we need to get the SIP URI of the remote and convert it to an Address
             let remoteAddress = try Factory.Instance.createAddress(addr: recipient)
-
-            // We also need a CallParams object
-            // Create call params expects a Call object for incoming calls, but for outgoing we must use null safely
             let params = try mCore.createCallParams(call: nil)
-
-            // We can now configure it
-            // Here we ask for no encryption but we could ask for ZRTP/SRTP/DTLS
             params.mediaEncryption = MediaEncryption.None
-            // If we wanted to start the call with video directly
-            //params.videoEnabled = true
-
-            // Finally we start the call
             let _ = mCore.inviteAddressWithParams(addr: remoteAddress, params: params)
-            // Call process can be followed in onCallStateChanged callback from core listener
             resolve(nil)
-        } catch { NSLog(error.localizedDescription)
+        } catch { 
+            NSLog(error.localizedDescription)
             reject("Outgoing call failure", "Something has gone wrong", error)
         }
     }
@@ -340,11 +291,9 @@ class Sip: RCTEventEmitter {
         if let mic = microphone {
             mCore.inputAudioDevice = mic
         }
-
         if let speaker = earpiece {
             mCore.outputAudioDevice = speaker
         }
-
         resolve(true)
     }
 
@@ -416,7 +365,7 @@ class Sip: RCTEventEmitter {
     }
 
     @objc func configureAudioSession() {
-    mCore.configureAudioSession()
+        mCore.configureAudioSession()
     }
 
     @objc(activateAudioSession:)
@@ -426,7 +375,6 @@ class Sip: RCTEventEmitter {
 
     @objc(holdCall:withRejecter:)
     func holdCall(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        // Use the current call if it exists, otherwise check the calls list
         guard let call = mCore.currentCall ?? mCore.calls.first else {
             reject("no_call", "There is no active call to put on hold.", nil)
             return
@@ -443,7 +391,6 @@ class Sip: RCTEventEmitter {
 
     @objc(resumeCall:withRejecter:)
     func resumeCall(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        // Find the first paused call in the list
         guard let call = mCore.calls.first(where: { $0.state == .Paused }) else {
             reject("no_paused_call", "There is no paused call to resume.", nil)
             return
@@ -473,5 +420,4 @@ class Sip: RCTEventEmitter {
             reject("transfer_error", "Could not transfer the call.", error)
         }
     }
-
 }
