@@ -55,4 +55,7 @@ RCT_EXTERN_METHOD(transferCall:(NSString *)uri
                   withResolver:(RCTPromiseResolveBlock)resolve
                   withRejecter:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(configureAudioSession)
+RCT_EXTERN_METHOD(activateAudioSession:(BOOL)actived)
+
 @end
