@@ -141,3 +141,15 @@ export async function getMicStatus(): Promise<boolean> {
 export async function toggleMute(): Promise<void> {
   return Sip.toggleMute();
 }
+
+export function holdCall(): Promise<boolean> {
+  return Sip.holdCall();
+}
+
+export function resumeCall(): Promise<boolean> {
+  return Sip.resumeCall();
+}
+
+export function transferCall(uri: string): Promise<boolean> {
+  return Sip.transferCall(uri)
+}

@@ -398,4 +398,51 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
 
     promise.resolve(true)
   }
+
+   @ReactMethod
+  fun holdCall(promise: Promise) {
+    val call = core.currentCall ?: core.calls.firstOrNull()
+    if (call == null) {
+      promise.reject("NoCall", "No active call to hold")
+      return
+    }
+    val result = call.pause()
+    if (result == 0) {
+      promise.resolve(true)
+    } else {
+      promise.reject("HoldError", "Failed to hold call (error code $result)")
+    }
+  }
+
+  @ReactMethod
+  fun resumeCall(promise: Promise) {
+    val call = core.currentCall ?: core.calls.firstOrNull()
+    if (call == null) {
+      promise.reject("NoCall", "No paused call to resume")
+      return
+    }
+    val result = call.resume()
+    if (result == 0) {
+      promise.resolve(true)
+    } else {
+      promise.reject("ResumeError", "Failed to resume call (error code $result)")
+    }
+  }
+
+@ReactMethod
+  fun transferCall(targetUri: String, promise: Promise) {
+    val call = core.currentCall ?: core.calls.firstOrNull()
+    if (call == null) {
+      promise.reject("NoCall", "No active call to transfer")
+      return
+    }
+
+    try {
+      val result = call.transfer(targetUri)
+      if (result == 0) promise.resolve(true)
+      else promise.reject("TransferError", "Failed to transfer call (code $result)")
+    } catch (e: Throwable) {
+      promise.reject("TransferError", e.message ?: "Unknown error")
+    }
+  }
 }
