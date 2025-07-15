@@ -23,12 +23,20 @@ class Sip: RCTEventEmitter {
     var mCallAlreadyStopped : Bool = false;
 
     func stopCall() {
-        // Call has been terminated by any side
-
-        // Report to CallKit that the call is over, if the terminate action was initiated by other end of the call
+        // Use the flag to prevent this function from running more than once per call
+        if (mCallAlreadyStopped) { return }
+    
+        // Report to CallKit that the call is over
         if (self.isCallRunning) {
             self.mProviderDelegate.stopCall()
         }
+    
+        // Mark as stopped to avoid race conditions and redundant calls
+        mCallAlreadyStopped = true
+        // Also reset your other state variables
+        isCallRunning = false
+        isCallIncoming = false
+        mCall = nil
     }
 
     @objc func delete() {
@@ -407,9 +415,11 @@ class Sip: RCTEventEmitter {
         resolve(mCore.micEnabled)
     }
 
-    func configureAudioSession() {
-        mCore.configureAudioSession()
+    @objc func configureAudioSession() {
+    mCore.configureAudioSession()
     }
+
+    @objc(activateAudioSession:)
     func activateAudioSession(actived: Bool) {
         mCore.activateAudioSession(actived: actived)
     }
