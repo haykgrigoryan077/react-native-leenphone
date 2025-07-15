@@ -63,16 +63,29 @@ class CallKitProviderDelegate : NSObject
 extension CallKitProviderDelegate: CXProviderDelegate {
     
     func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
-        do {
-            if (tutorialContext.mCall?.state != .End && tutorialContext.mCall?.state != .Released)  {
-                try tutorialContext.mCall?.terminate()
-            }
-        } catch { NSLog(error.localizedDescription) }
-        
-        tutorialContext.isCallRunning = false
-        tutorialContext.isCallIncoming = false
+    // 1. Check if call is already being stopped.
+    if (tutorialContext.mCallAlreadyStopped) {
         action.fulfill()
+        return
     }
+
+    guard let call = tutorialContext.mCall, (call.state != .End && call.state != .Released) else {
+        action.fulfill()
+        return // No call or call already ended.
+    }
+
+    // 2. Set the flag to "claim" the termination action.
+    tutorialContext.mCallAlreadyStopped = true
+
+    do {
+        try call.terminate()
+    } catch {
+        NSLog("Failed to terminate call from CallKit: \(error.localizedDescription)")
+        tutorialContext.mCallAlreadyStopped = false // Reset flag on failure
+    }
+    
+    action.fulfill()
+}
     
     func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
         do {

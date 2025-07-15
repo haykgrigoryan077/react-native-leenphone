@@ -231,20 +231,30 @@ class Sip: RCTEventEmitter {
 
     @objc(hangUp:withRejecter:)
     func hangUp(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        NSLog("Trying to hang up")
-        do {
-            if (mCore.callsNb == 0) { return }
-            self.mCall = (mCore.currentCall != nil) ? mCore.currentCall : mCore.calls[0]
-            if let call = self.mCall {
-                try call.terminate()
-            } else {
-                reject("No call", "No call to terminate", nil)
-            }
-        } catch {
-            NSLog(error.localizedDescription)
-            reject("Call termination failed", "Call termination failed", error)
-        }
+    // 1. Check if call is already being stopped.
+    if (mCallAlreadyStopped) {
+        resolve(true)
+        return
     }
+
+    guard let call = mCore.currentCall ?? mCore.calls.first else {
+        resolve(true) // No call exists, nothing to do.
+        return
+    }
+
+    // 2. Set the flag to "claim" the termination action.
+    mCallAlreadyStopped = true
+    NSLog("Trying to hang up")
+
+    do {
+        try call.terminate()
+        resolve(true)
+    } catch {
+        NSLog(error.localizedDescription)
+        mCallAlreadyStopped = false // Reset flag on failure
+        reject("Call termination failed", "Call termination failed", error)
+    }
+}
 
     @objc(loudAudio:withRejecter:)
     func loudAudio(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
