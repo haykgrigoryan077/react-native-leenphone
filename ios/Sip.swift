@@ -414,4 +414,54 @@ class Sip: RCTEventEmitter {
         mCore.activateAudioSession(actived: actived)
     }
 
+    @objc(holdCall:withRejecter:)
+    func holdCall(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+        // Use the current call if it exists, otherwise check the calls list
+        guard let call = mCore.currentCall ?? mCore.calls.first else {
+            reject("no_call", "There is no active call to put on hold.", nil)
+            return
+        }
+        
+        do {
+            try call.pause()
+            resolve(true)
+        } catch {
+            NSLog("Failed to hold call: \(error.localizedDescription)")
+            reject("hold_error", "Could not put the call on hold.", error)
+        }
+    }
+
+    @objc(resumeCall:withRejecter:)
+    func resumeCall(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+        // Find the first paused call in the list
+        guard let call = mCore.calls.first(where: { $0.state == .Paused }) else {
+            reject("no_paused_call", "There is no paused call to resume.", nil)
+            return
+        }
+        
+        do {
+            try call.resume()
+            resolve(true)
+        } catch {
+            NSLog("Failed to resume call: \(error.localizedDescription)")
+            reject("resume_error", "Could not resume the call.", error)
+        }
+    }
+
+    @objc(transferCall:withResolver:withRejecter:)
+    func transferCall(uri: String, resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+        guard let call = mCore.currentCall ?? mCore.calls.first else {
+            reject("no_call", "There is no active call to transfer.", nil)
+            return
+        }
+        
+        do {
+            try call.transfer(referTo: uri)
+            resolve(true)
+        } catch {
+            NSLog("Failed to transfer call: \(error.localizedDescription)")
+            reject("transfer_error", "Could not transfer the call.", error)
+        }
+    }
+
 }
