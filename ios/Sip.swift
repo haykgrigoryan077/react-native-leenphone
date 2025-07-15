@@ -62,8 +62,8 @@ class Sip: RCTEventEmitter {
 
             try? mCore = Factory.Instance.createCore(configPath: "", factoryConfigPath: "", systemContext: nil)
             
-            // FIX: Disable local ringback tone to prevent mediastreamer crash on call cancel
-            mCore.remoteRingbackTone = nil
+            // FIX: Assign empty string "" instead of nil to prevent type error.
+            mCore.remoteRingbackTone = ""
             
             mProviderDelegate = CallKitProviderDelegate(context: self)
             mCore.callkitEnabled = true
@@ -84,13 +84,13 @@ class Sip: RCTEventEmitter {
                       if (!self.isCallIncoming) {
                           self.mCall = call
                           self.isCallIncoming = true
-                          self.mCallAlreadyStopped = false // FIX: Reset flag for new call
+                          self.mCallAlreadyStopped = false // Reset flag for new call
                           self.mProviderDelegate.incomingCall()
                       }
                       self.sendEvent(eventName: "IncomingReceived")
 
                    case .OutgoingInit:
-                      self.mCallAlreadyStopped = false // FIX: Reset flag for new call
+                      self.mCallAlreadyStopped = false // Reset flag for new call
                       self.sendEvent(eventName: "ConnectionRequested")
                 case .OutgoingProgress:
                       self.sendEvent(eventName: "CallRequested")
@@ -123,7 +123,7 @@ class Sip: RCTEventEmitter {
                       if (!self.isCallIncoming) {
                           self.mCall = call
                           self.isCallIncoming = true
-                          self.mCallAlreadyStopped = false // FIX: Reset flag for new call
+                          self.mCallAlreadyStopped = false // Reset flag for new call
                           self.mProviderDelegate.incomingCall()
                       }
                       self.sendEvent(eventName: "CallPushIncomingReceived")
