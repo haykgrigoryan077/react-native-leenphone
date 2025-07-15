@@ -47,10 +47,13 @@ class CallKitProviderDelegate : NSObject
     
     func stopCall()
     {
-        let endCallAction = CXEndCallAction(call: incomingCallUUID)
-        let transaction = CXTransaction(action: endCallAction)
-        
-        mCallController.request(transaction, completion: { error in }) // Report to CallKit a call must end
+    // Safely unwrap the UUID. If it's nil (for an outgoing call), do nothing.
+    guard let uuid = incomingCallUUID else { return }
+    
+    let endCallAction = CXEndCallAction(call: uuid)
+    let transaction = CXTransaction(action: endCallAction)
+    
+    mCallController.request(transaction, completion: { error in }) // Report to CallKit a call must end
     }
     
 }
