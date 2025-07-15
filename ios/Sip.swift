@@ -224,15 +224,10 @@ class Sip: RCTEventEmitter {
     @objc(unregister:withRejecter:)
     func unregister(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock)
     {
-        if let account = mCore.defaultAccount {
-            let params = account.params
-            let clonedParams = params?.clone()
-            clonedParams?.registerEnabled = false
-            account.params = clonedParams
-            mCore.removeAccount(account: account)
-            mCore.clearAllAuthInfo()
-        }
+        mCore.stop()
+        resolve(true)
     }
+
 
     @objc(hangUp:withRejecter:)
     func hangUp(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {

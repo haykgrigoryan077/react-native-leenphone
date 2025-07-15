@@ -16,8 +16,7 @@ class CallKitProviderDelegate : NSObject
 {
     private let provider: CXProvider
     let mCallController = CXCallController()
-    var tutorialContext : Sip!
-    
+    weak var tutorialContext : Sip!    
     var incomingCallUUID : UUID!
     
     init(context: Sip)
