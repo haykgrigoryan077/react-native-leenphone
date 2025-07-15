@@ -153,3 +153,11 @@ export function resumeCall(): Promise<boolean> {
 export function transferCall(uri: string): Promise<boolean> {
   return Sip.transferCall(uri)
 }
+
+export function configureAudioSession(): Promise<void> {
+  return Sip.configureAudioSession();
+}
+
+export function activateAudioSession(active: boolean): Promise<void> {
+  return Sip.activateAudioSession(active);
+}
