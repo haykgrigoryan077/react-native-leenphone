@@ -90,7 +90,27 @@ extension CallKitProviderDelegate: CXProviderDelegate {
         action.fulfill()
     }
     
-    func provider(_ provider: CXProvider, perform action: CXSetHeldCallAction) {}
+    func provider(_ provider: CXProvider, perform action: CXSetHeldCallAction) {
+        guard let call = tutorialContext.mCall else {
+            action.fail()
+            return
+        }
+
+        do {
+            // Check if the action is to place the call on hold or to remove it from hold
+            if action.isOnHold {
+                try call.pause()
+            } else {
+                try call.resume()
+            }
+            // IMPORTANT: You must fulfill the action to tell CallKit it was successful.
+            action.fulfill()
+        } catch {
+            NSLog("Failed to set hold state: \(error.localizedDescription)")
+            action.fail()
+        }
+    }
+    
     func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
         // This tutorial is not doing outgoing calls. If it had to do so,
         // configureAudioSession() shall be called from here, just before launching the

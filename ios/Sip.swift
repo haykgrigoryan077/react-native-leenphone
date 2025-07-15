@@ -25,18 +25,15 @@ class Sip: RCTEventEmitter {
     func stopCall() {
         // Use the flag to prevent this function from running more than once per call
         if (mCallAlreadyStopped) { return }
-    
-        // Report to CallKit that the call is over
-        if (self.isCallRunning) {
-            self.mProviderDelegate.stopCall()
-        }
-    
-        // Mark as stopped to avoid race conditions and redundant calls
         mCallAlreadyStopped = true
-        // Also reset your other state variables
+    
+        // The SDK has already told us the call is over.
+        // We just need to clean up our app's internal state variables.
         isCallRunning = false
         isCallIncoming = false
         mCall = nil
+    
+        // DO NOT call self.mProviderDelegate.stopCall() here.
     }
 
     @objc func delete() {
