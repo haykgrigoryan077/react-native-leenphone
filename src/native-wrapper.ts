@@ -161,3 +161,7 @@ export function configureAudioSession(): Promise<void> {
 export function activateAudioSession(active: boolean): Promise<void> {
   return Sip.activateAudioSession(active);
 }
+
+export async function answer(): Promise<void> {
+  return Sip.answer();
+}

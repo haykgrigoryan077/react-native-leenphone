@@ -54,6 +54,20 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
   }
 
   @ReactMethod
+  fun answer(promise: Promise) {
+    // Find the incoming call. It's the one in the IncomingReceived state.
+    val call = core.calls.find { it.state == Call.State.IncomingReceived }
+
+    if (call != null) {
+      // Accept the call
+      call.accept()
+      promise.resolve(null)
+    } else {
+      promise.reject("NoCall", "No incoming call to answer")
+    }
+  }
+
+  @ReactMethod
   fun bluetoothAudio(promise: Promise) {
     if (bluetoothMic != null) {
       core.inputAudioDevice = bluetoothMic
@@ -102,9 +116,11 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
       ) {
         when (state) {
           Call.State.IncomingReceived -> {
-            // Immediately hang up when we receive a call. There's nothing inherently wrong with this
-            // but we don't need it right now, so better to leave it deactivated.
-            call.terminate()
+            // A new call is incoming, notify the JS layer
+            val map = Arguments.createMap()
+            map.putString("from", call.remoteAddress?.asStringUriOnly())
+            // We use the same event as push notifications for consistency
+            sendEvent("CallPushIncomingReceived", map)
           }
           Call.State.OutgoingInit -> {
             // First state an outgoing call will go through
@@ -151,7 +167,10 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
             sendEvent("CallEnd")
           }
           Call.State.PushIncomingReceived -> {
-            sendEvent("CallPushIncomingReceived")
+            // This event has no payload from the native side,
+            // but we keep the case for compatibility.
+            // The IncomingReceived case now handles passing data.
+            sendEvent("CallPushIncomingReceived", null)
           }
           else -> {
           }
@@ -203,43 +222,26 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     if (transportType == 2) { _transportType = TransportType.Tls }
     if (transportType == 3) { _transportType = TransportType.Dtls }
 
-    // To configure a SIP account, we need an Account object and an AuthInfo object
-    // The first one is how to connect to the proxy server, the second one stores the credentials
-
-    // The auth info can be created from the Factory as it's only a data class
-    // userID is set to null as it's the same as the username in our case
-    // ha1 is set to null as we are using the clear text password. Upon first register, the hash will be computed automatically.
-    // The realm will be determined automatically from the first register, as well as the algorithm
     val authInfo =
       Factory.instance().createAuthInfo(username, null, password, null, null, domain, null)
 
-    // Account object replaces deprecated ProxyConfig object
-    // Account object is configured through an AccountParams object that we can obtain from the Core
     val accountParams = core.createAccountParams()
 
-    // A SIP account is identified by an identity address that we can construct from the username and domain
     val identity = Factory.instance().createAddress("sip:$username@$domain")
     accountParams.identityAddress = identity
 
-    // We also need to configure where the proxy server is located
     val address = Factory.instance().createAddress("sip:$domain")
-    // We use the Address object to easily set the transport protocol
     address?.transport = _transportType
     accountParams.serverAddress = address
-    // And we ensure the account will start the registration process
     accountParams.isRegisterEnabled = true
 
-    // Now that our AccountParams is configured, we can create the Account object
     val account = core.createAccount(accountParams)
 
-    // Now let's add our objects to the Core
     core.addAuthInfo(authInfo)
     core.addAccount(account)
 
-    // Also set the newly added account as default
     core.defaultAccount = account
 
-    // We can also register a callback on the Account object
     account.addListener { _, state, message ->
       when (state) {
         RegistrationState.Ok -> {
@@ -280,26 +282,15 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
 
   @ReactMethod
   fun outgoingCall(recipient: String, promise: Promise) {
-    // As for everything we need to get the SIP URI of the remote and convert it to an Address
     val remoteAddress = Factory.instance().createAddress(recipient)
     if (remoteAddress == null) {
       promise.reject("Invalid SIP URI", "Invalid SIP URI")
     } else {
-      // We also need a CallParams object
-      // Create call params expects a Call object for incoming calls, but for outgoing we must use null safely
       val params = core.createCallParams(null)
-      params ?: return // Same for params
+      params ?: return
 
-      // We can now configure it
-      // Here we ask for no encryption but we could ask for ZRTP/SRTP/DTLS
       params.mediaEncryption = MediaEncryption.None
-      // If we wanted to start the call with video directly
-      //params.enableVideo(true)
-
-      // Finally we start the call
       core.inviteAddressWithParams(remoteAddress, params)
-      // Call process can be followed in onCallStateChanged callback from core listener
-
       promise.resolve(null)
     }
 
@@ -384,11 +375,9 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
 
   @ReactMethod
   fun unregister(promise: Promise) {
-    // Here we will disable the registration of our Account
     val account = core.defaultAccount
     account ?: return
 
-    // Returned params object is const, so to make changes we first need to clone it
     val params = account.params.clone()
 
     params.isRegisterEnabled = false
