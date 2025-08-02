@@ -55,16 +55,16 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
 
   @ReactMethod
   fun answer(promise: Promise) {
-    // Find the incoming call. It's the one in the IncomingReceived state.
-    val call = core.calls.find { it.state == Call.State.IncomingReceived }
-
-    if (call != null) {
-      // Accept the call
-      call.accept()
-      promise.resolve(null)
-    } else {
-      promise.reject("NoCall", "No incoming call to answer")
-    }
+    core.calls.find { it.state == Call.State.IncomingReceived }?.let { call ->
+      try {
+        call.accept()
+        core.inputAudioDevice = microphone ?: core.audioDevices.firstOrNull()
+        core.outputAudioDevice = earpiece ?: loudSpeaker ?: core.audioDevices.firstOrNull()
+        promise.resolve(null)
+      } catch (e: Exception) {
+        promise.reject("AnswerError", e.message)
+      }
+    } ?: promise.reject("NoCall", "No incoming call to answer")
   }
 
   @ReactMethod
