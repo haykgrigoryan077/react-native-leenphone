@@ -6,6 +6,8 @@ import com.facebook.react.bridge.*
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import org.linphone.core.*
 
+import android.media.AudioManager
+
 
 class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
   private val context = reactContext.applicationContext
@@ -434,4 +436,33 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
       promise.reject("TransferError", e.message ?: "Unknown error")
     }
   }
+
+  @ReactMethod
+fun configureAudioSession(promise: Promise) {
+  try {
+    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+    audioManager.isSpeakerphoneOn = false
+    promise.resolve(true)
+  } catch (e: Exception) {
+    promise.reject("AudioSessionError", e.message)
+  }
+}
+
+@ReactMethod
+fun activateAudioSession(active: Boolean, promise: Promise) {
+  try {
+    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    if (active) {
+      audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+      audioManager.isMicrophoneMute = false
+    } else {
+      audioManager.mode = AudioManager.MODE_NORMAL
+    }
+    promise.resolve(true)
+  } catch (e: Exception) {
+    promise.reject("ActivateAudioError", e.message)
+  }
+}
+
 }
