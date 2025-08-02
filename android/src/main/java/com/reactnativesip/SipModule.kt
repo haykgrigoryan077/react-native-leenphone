@@ -6,6 +6,7 @@ import com.facebook.react.bridge.*
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import org.linphone.core.*
 
+import android.content.Context
 import android.media.AudioManager
 
 
