@@ -165,3 +165,11 @@ export function activateAudioSession(active: boolean): Promise<void> {
 export async function answer(): Promise<void> {
   return Sip.answer();
 }
+
+export async function muteCallAudio(muted: boolean): Promise<void> {
+  return Sip.muteCallAudio(muted);
+}
+
+export async function setCallOutputVolume(volume: number): Promise<void> {
+  return Sip.setCallOutputVolume(volume);
+}
