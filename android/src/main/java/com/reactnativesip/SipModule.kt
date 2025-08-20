@@ -466,4 +466,38 @@ fun activateAudioSession(active: Boolean, promise: Promise) {
   }
 }
 
+@ReactMethod
+fun muteCallAudio(muted: Boolean, promise: Promise) {
+  try {
+    val call = core.currentCall ?: core.calls.firstOrNull()
+    if (call == null) {
+      promise.reject("NoCall", "No active call to mute")
+      return
+    }
+    
+    // Use Linphone's built-in call audio control
+    call.speakerVolumeGain = if (muted) 0.0f else 1.0f
+    promise.resolve(true)
+  } catch (e: Exception) {
+    promise.reject("MuteAudioError", e.message)
+  }
+}
+
+@ReactMethod 
+fun setCallOutputVolume(volume: Float, promise: Promise) {
+  try {
+    val call = core.currentCall ?: core.calls.firstOrNull()
+    if (call == null) {
+      promise.reject("NoCall", "No active call")
+      return
+    }
+    
+    // volume: 0.0f = silent, 1.0f = normal, can go higher for amplification
+    call.speakerVolumeGain = volume
+    promise.resolve(true)
+  } catch (e: Exception) {
+    promise.reject("VolumeError", e.message)
+  }
+}
+
 }
