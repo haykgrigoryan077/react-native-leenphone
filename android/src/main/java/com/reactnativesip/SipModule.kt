@@ -376,20 +376,28 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     promise.resolve(!micEnabled)
   }
 
-  @ReactMethod
-  fun unregister(promise: Promise) {
+@ReactMethod
+fun unregister(promise: Promise) {
     val account = core.defaultAccount
     account ?: return
 
-    val params = account.params.clone()
+    val listener = object : AccountListenerStub() {
+        override fun onRegistrationStateChanged(account: Account, state: RegistrationState, message: String) {
+            if (state == RegistrationState.Cleared || state == RegistrationState.None) {
+                account.removeListener(this)
+                core.removeAccount(account)
+                core.clearAllAuthInfo()
+            }
+        }
+    }
+    account.addListener(listener)
 
+    val params = account.params.clone()
     params.isRegisterEnabled = false
     account.params = params
-    core.removeAccount(account)
-    core.clearAllAuthInfo()
-
+    
     promise.resolve(true)
-  }
+}
 
    @ReactMethod
   fun holdCall(promise: Promise) {
