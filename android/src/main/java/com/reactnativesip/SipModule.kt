@@ -406,38 +406,37 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
   @ReactMethod
   fun unregister(promise: Promise) {
     try {
-        Log.i(TAG, "=== SIMPLE UNREGISTER START ===")
-        
         if (!::core.isInitialized) {
-            Log.i(TAG, "Core not initialized")
             promise.resolve(true)
             return
         }
         
-        // NUCLEAR OPTION: Just stop the core completely
-        // This is the only reliable way that doesn't crash
-        Log.i(TAG, "Stopping core completely...")
-        core.stop()
+        val account = core.defaultAccount
+        if (account == null) {
+            promise.resolve(true)
+            return
+        }
         
-        // Wait a moment for the stop to complete
+        // Simple fix: Set expires=0 before disabling
+        val params = account.params.clone()
+        params.expires = 0
+        params.isRegisterEnabled = true  // Keep enabled to send the expires=0
+        account.params = params
+        account.refreshRegister()  // Force send REGISTER with expires=0
+        
+        // Wait 3 seconds then clean up
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
             try {
-                Log.i(TAG, "Clearing all accounts and auth info...")
-                core.clearAccounts()
+                core.removeAccount(account)
                 core.clearAllAuthInfo()
-                Log.i(TAG, "Unregister completed - core stopped")
                 promise.resolve(true)
             } catch (e: Exception) {
-                Log.e(TAG, "Error in final cleanup: ${e.message}")
-                promise.resolve(true) // Still resolve to prevent hanging
+                promise.resolve(true)
             }
-        }, 1000)
-        
-        Log.i(TAG, "=== SIMPLE UNREGISTER END ===")
+        }, 3000)
         
     } catch (e: Exception) {
-        Log.e(TAG, "Critical error in unregister: ${e.message}")
-        promise.resolve(true) // Always resolve to prevent hanging
+        promise.resolve(true)
     }
   }
 
