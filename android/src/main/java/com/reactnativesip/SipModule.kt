@@ -406,35 +406,8 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
   @ReactMethod
   fun unregister(promise: Promise) {
     try {
-        if (!::core.isInitialized) {
-            promise.resolve(true)
-            return
-        }
-        
-        val account = core.defaultAccount
-        if (account == null) {
-            promise.resolve(true)
-            return
-        }
-        
-        // Simple fix: Set expires=0 before disabling
-        val params = account.params.clone()
-        params.expires = 0
-        params.isRegisterEnabled = true  // Keep enabled to send the expires=0
-        account.params = params
-        account.refreshRegister()  // Force send REGISTER with expires=0
-        
-        // Wait 3 seconds then clean up
-        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-            try {
-                core.removeAccount(account)
-                core.clearAllAuthInfo()
-                promise.resolve(true)
-            } catch (e: Exception) {
-                promise.resolve(true)
-            }
-        }, 3000)
-        
+        core.stop()
+        promise.resolve(true)
     } catch (e: Exception) {
         promise.resolve(true)
     }
