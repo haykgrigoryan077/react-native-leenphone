@@ -406,7 +406,22 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
   @ReactMethod
   fun unregister(promise: Promise) {
     try {
-        core.stop()
+        if (::core.isInitialized) {
+            val account = core.defaultAccount
+            if (account != null) {
+                // Try to send unregister first - this is the key part that sometimes worked
+                try {
+                    val params = account.params.clone()
+                    params.isRegisterEnabled = false
+                    account.params = params
+                } catch (e: Exception) {
+                    // If account manipulation fails, ignore and continue
+                }
+            }
+            
+            // Always stop the core regardless of above success/failure
+            core.stop()
+        }
         promise.resolve(true)
     } catch (e: Exception) {
         promise.resolve(true)
