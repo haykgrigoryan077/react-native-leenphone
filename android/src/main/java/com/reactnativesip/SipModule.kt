@@ -401,21 +401,77 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
         return
       }
 
-      // Stop the core completely - this ensures proper unregistration
-      Log.i(TAG, "Stopping core")
-      core.stop()
+      // METHOD 1: Proper Account API unregistration with waiting
+      val listener = object : AccountListenerStub() {
+        override fun onRegistrationStateChanged(account: Account, state: RegistrationState, message: String) {
+          Log.i(TAG, "Registration state changed to: $state")
+          when (state) {
+            RegistrationState.Cleared, RegistrationState.None -> {
+              Log.i(TAG, "Account successfully unregistered")
+              account.removeListener(this)
+              
+              core.removeAccount(account)
+              core.clearAllAuthInfo()
+              
+              promise.resolveOnce(true)
+            }
+            RegistrationState.Failed -> {
+              Log.w(TAG, "Unregistration failed, but cleaning up anyway")
+              account.removeListener(this)
+              core.removeAccount(account)
+              core.clearAllAuthInfo()
+              promise.resolveOnce(true)
+            }
+            else -> {
+              // Still waiting for unregistration to complete
+              Log.d(TAG, "Waiting for unregistration, current state: $state")
+            }
+          }
+        }
+      }
       
-      // Clear all accounts and auth info
-      Log.i(TAG, "Clearing accounts and auth info")
-      core.clearAccounts()
-      core.clearAllAuthInfo()
+      account.addListener(listener)
       
-      Log.i(TAG, "Unregister completed successfully")
-      promise.resolve(true)
+      // Start unregistration process
+      Log.i(TAG, "Disabling registration for account")
+      val params = account.params.clone()
+      params.isRegisterEnabled = false
+      account.params = params
+      
+      android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+        Log.w(TAG, "Unregistration timeout, forcing cleanup")
+        try {
+          account.removeListener(listener)
+          core.removeAccount(account)
+          core.clearAllAuthInfo()
+          if (!promise.hasBeenResolved()) {
+            promise.resolveOnce(true)
+          }
+        } catch (e: Exception) {
+          Log.e(TAG, "Error in timeout cleanup: ${e.message}")
+        }
+      }, 5000) // 5 second timeout
       
     } catch (e: Exception) {
       Log.e(TAG, "Error during unregister: ${e.message}")
       promise.reject("UnregisterError", e.message)
+    }
+  }
+
+  private val resolvedPromises = mutableSetOf<Promise>()
+  
+  private fun Promise.hasBeenResolved(): Boolean {
+    return resolvedPromises.contains(this)
+  }
+  
+  private fun Promise.resolveOnce(value: Any?) {
+    if (!hasBeenResolved()) {
+      resolvedPromises.add(this)
+      resolve(value)
+      // Clean up resolved promises periodically
+      android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+        resolvedPromises.remove(this)
+      }, 10000)
     }
   }
 
