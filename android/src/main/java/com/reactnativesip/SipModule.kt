@@ -426,7 +426,7 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
         
         Log.i(TAG, "Account found: ${account.params?.identityAddress?.asString()}")
         
-        // BETTER APPROACH: Use a one-time listener for just this unregistration
+        // Use a safer approach - defer cleanup to avoid crashes in callback
         var promiseResolved = false
         val unregisterListener = object : AccountListenerStub() {
             override fun onRegistrationStateChanged(account: Account, state: RegistrationState, message: String) {
@@ -434,18 +434,22 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
                 when (state) {
                     RegistrationState.Cleared, RegistrationState.None -> {
                         if (!promiseResolved) {
-                            Log.i(TAG, "Account successfully unregistered")
+                            Log.i(TAG, "Account successfully unregistered - deferring cleanup")
                             promiseResolved = true
                             account.removeListener(this)
                             
-                            // Clean up after successful unregistration
-                            try {
-                                core.removeAccount(account)
-                                core.clearAllAuthInfo()
-                                promise.resolve(true)
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Cleanup error: ${e.message}")
-                                promise.resolve(true)
+                            // CRITICAL: Defer the cleanup to avoid crashes in callback
+                            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                try {
+                                    Log.i(TAG, "Performing deferred cleanup...")
+                                    core.removeAccount(account)
+                                    core.clearAllAuthInfo()
+                                    Log.i(TAG, "Deferred cleanup completed")
+                                    promise.resolve(true)
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Deferred cleanup error: ${e.message}")
+                                    promise.resolve(true)
+                                }
                             }
                         }
                     }
@@ -455,13 +459,18 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
                             promiseResolved = true
                             account.removeListener(this)
                             
-                            try {
-                                core.removeAccount(account)
-                                core.clearAllAuthInfo()
-                                promise.resolve(true)
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Failed cleanup error: ${e.message}")
-                                promise.resolve(true)
+                            // Also defer cleanup on failure
+                            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                try {
+                                    Log.i(TAG, "Performing failed cleanup...")
+                                    core.removeAccount(account)
+                                    core.clearAllAuthInfo()
+                                    Log.i(TAG, "Failed cleanup completed")
+                                    promise.resolve(true)
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "Failed cleanup error: ${e.message}")
+                                    promise.resolve(true)
+                                }
                             }
                         }
                     }
