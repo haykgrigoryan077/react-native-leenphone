@@ -9,6 +9,9 @@ import org.linphone.core.*
 import android.content.Context
 import android.media.AudioManager
 
+import android.os.Handler
+import android.os.Looper
+
 
 class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
   private val context = reactContext.applicationContext
@@ -410,18 +413,18 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
               promise.resolve(true)
               return
           }
-        
+
           val account = core.defaultAccount
           if (account == null) {
               promise.resolve(true)
               return
           }
-        
+
           // Set registerEnabled = false
           val newParams = account.params.clone()
           newParams.isRegisterEnabled = false
           account.params = newParams
-        
+
           // Wait for unregistration before stopping core
           account.addListener { _, state, _ ->
               if (state == RegistrationState.Cleared) {
@@ -429,16 +432,16 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
                   promise.resolve(true)
               }
           }
-        
+
           // Ensure the core is running and network is reachable
           core.isNetworkReachable = true
           core.start()
-        
+
           // Optional: timeout fallback (just in case it hangs)
           Handler(Looper.getMainLooper()).postDelayed({
               promise.resolve(true) // still resolve even if timeout
           }, 3000)
-        
+
       } catch (e: Exception) {
           promise.reject("UnregisterError", e.message)
       }
