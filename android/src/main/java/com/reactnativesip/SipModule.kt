@@ -405,27 +405,43 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
 
   @ReactMethod
   fun unregister(promise: Promise) {
-    try {
-        if (::core.isInitialized) {
-            val account = core.defaultAccount
-            if (account != null) {
-                // Try to send unregister first - this is the key part that sometimes worked
-                try {
-                    val params = account.params.clone()
-                    params.isRegisterEnabled = false
-                    account.params = params
-                } catch (e: Exception) {
-                    // If account manipulation fails, ignore and continue
-                }
-            }
-            
-            // Always stop the core regardless of above success/failure
-            core.stop()
-        }
-        promise.resolve(true)
-    } catch (e: Exception) {
-        promise.resolve(true)
-    }
+      try {
+          if (!::core.isInitialized) {
+              promise.resolve(true)
+              return
+          }
+        
+          val account = core.defaultAccount
+          if (account == null) {
+              promise.resolve(true)
+              return
+          }
+        
+          // Set registerEnabled = false
+          val newParams = account.params.clone()
+          newParams.isRegisterEnabled = false
+          account.params = newParams
+        
+          // Wait for unregistration before stopping core
+          account.addListener { _, state, _ ->
+              if (state == RegistrationState.Cleared) {
+                  Log.i(TAG, "Unregistered from SIP successfully.")
+                  promise.resolve(true)
+              }
+          }
+        
+          // Ensure the core is running and network is reachable
+          core.isNetworkReachable = true
+          core.start()
+        
+          // Optional: timeout fallback (just in case it hangs)
+          Handler(Looper.getMainLooper()).postDelayed({
+              promise.resolve(true) // still resolve even if timeout
+          }, 3000)
+        
+      } catch (e: Exception) {
+          promise.reject("UnregisterError", e.message)
+      }
   }
 
   @ReactMethod
