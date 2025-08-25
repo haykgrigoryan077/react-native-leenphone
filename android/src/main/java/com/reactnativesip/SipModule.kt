@@ -379,22 +379,21 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
 @ReactMethod
 fun unregister(promise: Promise) {
     val account = core.defaultAccount
-    account ?: return
-
-    val listener = object : AccountListenerStub() {
-        override fun onRegistrationStateChanged(account: Account, state: RegistrationState, message: String) {
-            if (state == RegistrationState.Cleared || state == RegistrationState.None) {
-                account.removeListener(this)
-                core.removeAccount(account)
-                core.clearAllAuthInfo()
-            }
-        }
+    if (account == null) {
+        promise.resolve(true)
+        return
     }
-    account.addListener(listener)
 
+    core.setNetworkReachable(false)
+    
     val params = account.params.clone()
     params.isRegisterEnabled = false
     account.params = params
+    
+    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+        core.removeAccount(account)
+        core.clearAllAuthInfo()
+    }, 1000)
     
     promise.resolve(true)
 }
