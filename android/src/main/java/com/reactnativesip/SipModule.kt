@@ -50,7 +50,6 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     .emit(eventName, body)
   }
 
-
   @ReactMethod
   fun addListener(eventName: String) {
     Log.d(TAG, "Added listener: $eventName")
@@ -101,6 +100,12 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
 
   @ReactMethod
   fun initialise(promise: Promise) {
+    // Check if core is already initialized and running
+    if (::core.isInitialized && core.globalState != GlobalState.Off) {
+      promise.resolve(null)
+      return
+    }
+    
     val factory = Factory.instance()
     factory.setDebugMode(true, "Connected to linphone")
     core = factory.createCore(null, null, context)
@@ -211,6 +216,11 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
         map.putString("message", message)
 
         sendEvent("AccountRegistrationStateChanged", map)
+        
+        // Send unregistered event for tracking
+        if (state == RegistrationState.Cleared || state == RegistrationState.None) {
+          sendEvent("AccountUnregistered", map)
+        }
       }
     }
 
@@ -244,6 +254,9 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     core.addAccount(account)
 
     core.defaultAccount = account
+    
+    // Ensure network is reachable for new logins
+    core.isNetworkReachable = true
 
     account.addListener { _, state, message ->
       when (state) {
@@ -376,29 +389,37 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     promise.resolve(!micEnabled)
   }
 
-@ReactMethod
-fun unregister(promise: Promise) {
-    val account = core.defaultAccount
-    if (account == null) {
+  @ReactMethod
+  fun unregister(promise: Promise) {
+    try {
+      Log.i(TAG, "Starting unregister process")
+      
+      val account = core.defaultAccount
+      if (account == null) {
+        Log.i(TAG, "No account to unregister")
         promise.resolve(true)
         return
+      }
+
+      // Stop the core completely - this ensures proper unregistration
+      Log.i(TAG, "Stopping core")
+      core.stop()
+      
+      // Clear all accounts and auth info
+      Log.i(TAG, "Clearing accounts and auth info")
+      core.clearAccounts()
+      core.clearAllAuthInfo()
+      
+      Log.i(TAG, "Unregister completed successfully")
+      promise.resolve(true)
+      
+    } catch (e: Exception) {
+      Log.e(TAG, "Error during unregister: ${e.message}")
+      promise.reject("UnregisterError", e.message)
     }
+  }
 
-    core.setNetworkReachable(false)
-    
-    val params = account.params.clone()
-    params.isRegisterEnabled = false
-    account.params = params
-    
-    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-        core.removeAccount(account)
-        core.clearAllAuthInfo()
-    }, 1000)
-    
-    promise.resolve(true)
-}
-
-   @ReactMethod
+  @ReactMethod
   fun holdCall(promise: Promise) {
     val call = core.currentCall ?: core.calls.firstOrNull()
     if (call == null) {
@@ -428,7 +449,7 @@ fun unregister(promise: Promise) {
     }
   }
 
-@ReactMethod
+  @ReactMethod
   fun transferCall(targetUri: String, promise: Promise) {
     val call = core.currentCall ?: core.calls.firstOrNull()
     if (call == null) {
@@ -446,65 +467,81 @@ fun unregister(promise: Promise) {
   }
 
   @ReactMethod
-fun configureAudioSession(promise: Promise) {
-  try {
-    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-    audioManager.isSpeakerphoneOn = false
-    promise.resolve(true)
-  } catch (e: Exception) {
-    promise.reject("AudioSessionError", e.message)
-  }
-}
-
-@ReactMethod
-fun activateAudioSession(active: Boolean, promise: Promise) {
-  try {
-    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    if (active) {
+  fun configureAudioSession(promise: Promise) {
+    try {
+      val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
       audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-      audioManager.isMicrophoneMute = false
-    } else {
-      audioManager.mode = AudioManager.MODE_NORMAL
+      audioManager.isSpeakerphoneOn = false
+      promise.resolve(true)
+    } catch (e: Exception) {
+      promise.reject("AudioSessionError", e.message)
     }
-    promise.resolve(true)
-  } catch (e: Exception) {
-    promise.reject("ActivateAudioError", e.message)
   }
-}
 
-@ReactMethod
-fun muteCallAudio(muted: Boolean, promise: Promise) {
-  try {
-    val call = core.currentCall ?: core.calls.firstOrNull()
-    if (call == null) {
-      promise.reject("NoCall", "No active call to mute")
-      return
+  @ReactMethod
+  fun activateAudioSession(active: Boolean, promise: Promise) {
+    try {
+      val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+      if (active) {
+        audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+        audioManager.isMicrophoneMute = false
+      } else {
+        audioManager.mode = AudioManager.MODE_NORMAL
+      }
+      promise.resolve(true)
+    } catch (e: Exception) {
+      promise.reject("ActivateAudioError", e.message)
     }
-    
-    // Use Linphone's built-in call audio control
-    call.speakerVolumeGain = if (muted) 0.0f else 1.0f
-    promise.resolve(true)
-  } catch (e: Exception) {
-    promise.reject("MuteAudioError", e.message)
   }
-}
 
-@ReactMethod 
-fun setCallOutputVolume(volume: Float, promise: Promise) {
-  try {
-    val call = core.currentCall ?: core.calls.firstOrNull()
-    if (call == null) {
-      promise.reject("NoCall", "No active call")
-      return
+  @ReactMethod
+  fun muteCallAudio(muted: Boolean, promise: Promise) {
+    try {
+      val call = core.currentCall ?: core.calls.firstOrNull()
+      if (call == null) {
+        promise.reject("NoCall", "No active call to mute")
+        return
+      }
+      
+      // Use Linphone's built-in call audio control
+      call.speakerVolumeGain = if (muted) 0.0f else 1.0f
+      promise.resolve(true)
+    } catch (e: Exception) {
+      promise.reject("MuteAudioError", e.message)
     }
-    
-    // volume: 0.0f = silent, 1.0f = normal, can go higher for amplification
-    call.speakerVolumeGain = volume
-    promise.resolve(true)
-  } catch (e: Exception) {
-    promise.reject("VolumeError", e.message)
   }
-}
 
+  @ReactMethod 
+  fun setCallOutputVolume(volume: Float, promise: Promise) {
+    try {
+      val call = core.currentCall ?: core.calls.firstOrNull()
+      if (call == null) {
+        promise.reject("NoCall", "No active call")
+        return
+      }
+      
+      call.speakerVolumeGain = volume
+      promise.resolve(true)
+    } catch (e: Exception) {
+      promise.reject("VolumeError", e.message)
+    }
+  }
+
+  @ReactMethod
+  fun shutdown(promise: Promise) {
+    try {
+      Log.i(TAG, "Shutting down SIP module")
+      
+      if (::core.isInitialized) {
+        core.stop()
+        core.clearAccounts()
+        core.clearAllAuthInfo()
+      }
+      
+      promise.resolve(true)
+    } catch (e: Exception) {
+      Log.e(TAG, "Error during shutdown: ${e.message}")
+      promise.reject("ShutdownError", e.message)
+    }
+  }
 }
