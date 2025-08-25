@@ -102,6 +102,7 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
   fun initialise(promise: Promise) {
     // Check if core is already initialized and running
     if (::core.isInitialized && core.globalState != GlobalState.Off) {
+      Log.i(TAG, "Core already initialized and running")
       promise.resolve(null)
       return
     }
@@ -109,8 +110,16 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     val factory = Factory.instance()
     factory.setDebugMode(true, "Connected to linphone")
     core = factory.createCore(null, null, context)
-    core.start()
-
+    
+    // Remove any existing listener first
+    coreListener?.let { listener ->
+      try {
+        core.removeListener(listener)
+      } catch (e: Exception) {
+        Log.w(TAG, "Failed to remove old listener: ${e.message}")
+      }
+    }
+    
     coreListener = object : CoreListenerStub() {
       override fun onAudioDevicesListUpdated(core: Core) {
         sendEvent("AudioDevicesChanged")
@@ -226,6 +235,8 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
 
     core.addListener(coreListener)
     this.coreListener = coreListener // Store the reference
+    
+    core.start()
     promise.resolve(null)
   }
 
@@ -415,48 +426,83 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
         
         Log.i(TAG, "Account found: ${account.params?.identityAddress?.asString()}")
         
-        // CRITICAL: Remove the core listener first to prevent crashes
-        Log.i(TAG, "Removing core listener to prevent crashes...")
-        coreListener?.let { listener ->
-            core.removeListener(listener)
-            Log.i(TAG, "Core listener removed successfully")
+        // BETTER APPROACH: Use a one-time listener for just this unregistration
+        var promiseResolved = false
+        val unregisterListener = object : AccountListenerStub() {
+            override fun onRegistrationStateChanged(account: Account, state: RegistrationState, message: String) {
+                Log.i(TAG, "Unregister listener - Registration state changed to: $state")
+                when (state) {
+                    RegistrationState.Cleared, RegistrationState.None -> {
+                        if (!promiseResolved) {
+                            Log.i(TAG, "Account successfully unregistered")
+                            promiseResolved = true
+                            account.removeListener(this)
+                            
+                            // Clean up after successful unregistration
+                            try {
+                                core.removeAccount(account)
+                                core.clearAllAuthInfo()
+                                promise.resolve(true)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Cleanup error: ${e.message}")
+                                promise.resolve(true)
+                            }
+                        }
+                    }
+                    RegistrationState.Failed -> {
+                        if (!promiseResolved) {
+                            Log.w(TAG, "Unregistration failed, cleaning up anyway")
+                            promiseResolved = true
+                            account.removeListener(this)
+                            
+                            try {
+                                core.removeAccount(account)
+                                core.clearAllAuthInfo()
+                                promise.resolve(true)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed cleanup error: ${e.message}")
+                                promise.resolve(true)
+                            }
+                        }
+                    }
+                    else -> {
+                        Log.d(TAG, "Waiting for unregistration, current state: $state")
+                    }
+                }
+            }
         }
         
-        // Try the simplest approach first - just disable registration
-        Log.i(TAG, "Attempting to disable registration...")
+        // Add the unregister-specific listener
+        account.addListener(unregisterListener)
+        
+        // Set a safety timeout
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            if (!promiseResolved) {
+                Log.w(TAG, "Unregistration timeout after 8 seconds, forcing cleanup")
+                promiseResolved = true
+                try {
+                    account.removeListener(unregisterListener)
+                    core.removeAccount(account)
+                    core.clearAllAuthInfo()
+                    promise.resolve(true)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Timeout cleanup error: ${e.message}")
+                    promise.resolve(true)
+                }
+            }
+        }, 8000)
+        
+        // Start the unregistration process
+        Log.i(TAG, "Starting unregistration process...")
         val params = account.params.clone()
         params.isRegisterEnabled = false
         account.params = params
-        
-        Log.i(TAG, "Registration disabled, waiting 2 seconds then cleaning up...")
-        
-        // Simple delayed cleanup without complex listeners
-        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-            try {
-                Log.i(TAG, "Timeout reached, performing cleanup...")
-                core.removeAccount(account)
-                core.clearAllAuthInfo()
-                Log.i(TAG, "Cleanup completed successfully")
-                promise.resolve(true)
-            } catch (cleanupError: Exception) {
-                Log.e(TAG, "Cleanup error: ${cleanupError.message}", cleanupError)
-                // Still resolve to prevent hanging
-                promise.resolve(true)
-            }
-        }, 2000)
         
         Log.i(TAG, "=== UNREGISTER DEBUG END ===")
         
     } catch (e: Exception) {
         Log.e(TAG, "CRITICAL ERROR in unregister: ${e.message}", e)
-        Log.e(TAG, "Stack trace: ${e.stackTrace.contentToString()}")
-        
-        // Try to resolve anyway to prevent hanging
-        try {
-            promise.resolve(false)
-        } catch (promiseError: Exception) {
-            Log.e(TAG, "Even promise resolution failed: ${promiseError.message}")
-        }
+        promise.resolve(false)
     }
   }
 
@@ -566,6 +612,27 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
       promise.resolve(true)
     } catch (e: Exception) {
       promise.reject("VolumeError", e.message)
+    }
+  }
+
+  @ReactMethod
+  fun getRegistrationState(promise: Promise) {
+    try {
+      if (!::core.isInitialized) {
+        promise.resolve("CORE_NOT_INITIALIZED")
+        return
+      }
+      
+      val account = core.defaultAccount
+      if (account == null) {
+        promise.resolve("NO_ACCOUNT")
+        return
+      }
+      
+      val state = account.state?.toString() ?: "UNKNOWN"
+      promise.resolve(state)
+    } catch (e: Exception) {
+      promise.resolve("ERROR: ${e.message}")
     }
   }
 
