@@ -111,7 +111,7 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     core = factory.createCore(null, null, context)
     core.start()
 
-    val coreListener = object : CoreListenerStub() {
+    coreListener = object : CoreListenerStub() {
       override fun onAudioDevicesListUpdated(core: Core) {
         sendEvent("AudioDevicesChanged")
       }
@@ -225,6 +225,7 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     }
 
     core.addListener(coreListener)
+    this.coreListener = coreListener // Store the reference
     promise.resolve(null)
   }
 
@@ -389,6 +390,8 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     promise.resolve(!micEnabled)
   }
 
+  private var coreListener: CoreListenerStub? = null // Add this at the top of your class
+
   @ReactMethod
   fun unregister(promise: Promise) {
     try {
@@ -411,6 +414,13 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
         }
         
         Log.i(TAG, "Account found: ${account.params?.identityAddress?.asString()}")
+        
+        // CRITICAL: Remove the core listener first to prevent crashes
+        Log.i(TAG, "Removing core listener to prevent crashes...")
+        coreListener?.let { listener ->
+            core.removeListener(listener)
+            Log.i(TAG, "Core listener removed successfully")
+        }
         
         // Try the simplest approach first - just disable registration
         Log.i(TAG, "Attempting to disable registration...")
