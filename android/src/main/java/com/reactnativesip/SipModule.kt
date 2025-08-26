@@ -105,9 +105,15 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
   @ReactMethod
   fun initialise(promise: Promise) {
     val factory = Factory.instance()
+
+    factory.setLogLevelMask(LogLevel.Debug)
+    factory.enableLogCollection(true)
+
     factory.setDebugMode(true, "Connected to linphone")
     core = factory.createCore(null, null, context)
     core.start()
+
+    Log.d(TAG, "[initialise] SIP core started")
 
     val coreListener = object : CoreListenerStub() {
       override fun onAudioDevicesListUpdated(core: Core) {
@@ -120,6 +126,7 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
         state: Call.State?,
         message: String
       ) {
+        Log.d(TAG, "[onCallStateChanged] state: $state, message: $message")
         when (state) {
           Call.State.IncomingReceived -> {
             // A new call is incoming, notify the JS layer
@@ -184,6 +191,7 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
       }
 
       override fun onAccountRegistrationStateChanged(core: Core, account: Account, state: RegistrationState?, message: String) {
+        Log.d(TAG, "[onAccountRegistrationStateChanged] state: $state, message: $message")
         val map = Arguments.createMap()
 
         val coreMap = Arguments.createMap()
@@ -380,33 +388,39 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
   }
 
   @ReactMethod
-  public void unregister(Promise promise) {
-    Core core = getCore(); // your existing method to get Linphone Core
-    if (core == null) {
-      promise.reject("CoreError", "SIP Core not initialized");
-      return;
+  fun unregister(promise: Promise) {
+    Log.d(TAG, "[unregister] Called")
+
+    if (!::core.isInitialized) {
+      Log.e(TAG, "[unregister] Core is not initialized")
+      promise.reject("CoreError", "SIP Core not initialized")
+      return
     }
 
-    Account account = core.getDefaultAccount();
+    val account = core.defaultAccount
     if (account == null) {
-      promise.reject("AccountError", "No SIP account to unregister");
-      return;
+      Log.e(TAG, "[unregister] No default account found")
+      promise.reject("AccountError", "No SIP account to unregister")
+      return
     }
 
-    AccountParams params = account.getParams().clone();
-    params.setRegisterEnabled(false);
-    account.setParams(params);
+    Log.d(TAG, "[unregister] Disabling registration")
+    val params = account.params.clone()
+    params.isRegisterEnabled = false
+    account.params = params
 
-    // ✅ Triggers REGISTER with Expires: 0
-    core.refreshRegisters();
+    Log.d(TAG, "[unregister] Calling refreshRegisters()")
+    core.refreshRegisters()
 
-    // 🕐 Wait 1 second, then optionally clean up
-    new Handler(Looper.getMainLooper()).postDelayed(() -> {
-      core.removeAccount(account);
-      core.clearAllAuthInfo();
-      promise.resolve(true);
-    }, 1000);
+    Log.d(TAG, "[unregister] Scheduling account removal after delay")
+    Handler(Looper.getMainLooper()).postDelayed({
+      Log.d(TAG, "[unregister] Removing account and clearing auth info")
+      core.removeAccount(account)
+      core.clearAllAuthInfo()
+      promise.resolve(true)
+    }, 1000)
   }
+
 
    @ReactMethod
   fun holdCall(promise: Promise) {
@@ -518,12 +532,13 @@ fun setCallOutputVolume(volume: Float, promise: Promise) {
 }
 
   @ReactMethod
-  public void shutdown(Promise promise) {
-    Core core = getCore();
-    if (core != null) {
-      core.stop();
+  fun shutdown(promise: Promise) {
+    Log.d(TAG, "[shutdown] Called")
+    if (::core.isInitialized) {
+      core.stop()
+      Log.d(TAG, "[shutdown] SIP core stopped")
     }
-    promise.resolve(true);
+    promise.resolve(true)
   }
 
 }
