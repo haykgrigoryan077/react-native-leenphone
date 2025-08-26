@@ -11,6 +11,7 @@ import android.media.AudioManager
 
 import android.os.Handler
 import android.os.Looper
+import org.linphone.core.LogCollectionState
 
 
 class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
@@ -106,10 +107,10 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
   fun initialise(promise: Promise) {
     val factory = Factory.instance()
 
-    factory.setLogLevelMask(LogLevel.Debug)
-    factory.enableLogCollection(true)
+    factory.enableLogCollection(LogCollectionState.Enabled)
 
     factory.setDebugMode(true, "Connected to linphone")
+
     core = factory.createCore(null, null, context)
     core.start()
 
@@ -129,69 +130,35 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
         Log.d(TAG, "[onCallStateChanged] state: $state, message: $message")
         when (state) {
           Call.State.IncomingReceived -> {
-            // A new call is incoming, notify the JS layer
             val map = Arguments.createMap()
             map.putString("from", call.remoteAddress?.asStringUriOnly())
-            // We use the same event as push notifications for consistency
             sendEvent("CallPushIncomingReceived", map)
           }
-          Call.State.OutgoingInit -> {
-            // First state an outgoing call will go through
-            sendEvent("ConnectionRequested")
-          }
-          Call.State.OutgoingProgress -> {
-            // First state an outgoing call will go through
-            sendEvent("CallRequested")
-          }
-          Call.State.OutgoingRinging -> {
-            // Once remote accepts, ringing will commence (180 response)
-            sendEvent("CallRinging")
-          }
-          Call.State.Connected -> {
-            sendEvent("CallConnected")
-          }
-          Call.State.StreamsRunning -> {
-            // This state indicates the call is active.
-            // You may reach this state multiple times, for example after a pause/resume
-            // or after the ICE negotiation completes
-            // Wait for the call to be connected before allowing a call update
-            sendEvent("CallStreamsRunning")
-          }
-          Call.State.Paused -> {
-            sendEvent("CallPaused")
-          }
-          Call.State.PausedByRemote -> {
-            sendEvent("CallPausedByRemote")
-          }
-          Call.State.Updating -> {
-            // When we request a call update, for example when toggling video
-            sendEvent("CallUpdating")
-          }
-          Call.State.UpdatedByRemote -> {
-            sendEvent("CallUpdatedByRemote")
-          }
-          Call.State.Released -> {
-            sendEvent("CallReleased")
-          }
-          Call.State.Error -> {
-            sendEvent("CallError")
-          }
-          Call.State.End -> {
-            sendEvent("CallEnd")
-          }
-          Call.State.PushIncomingReceived -> {
-            // This event has no payload from the native side,
-            // but we keep the case for compatibility.
-            // The IncomingReceived case now handles passing data.
-            sendEvent("CallPushIncomingReceived", null)
-          }
-          else -> {
-          }
+          Call.State.OutgoingInit -> sendEvent("ConnectionRequested")
+          Call.State.OutgoingProgress -> sendEvent("CallRequested")
+          Call.State.OutgoingRinging -> sendEvent("CallRinging")
+          Call.State.Connected -> sendEvent("CallConnected")
+          Call.State.StreamsRunning -> sendEvent("CallStreamsRunning")
+          Call.State.Paused -> sendEvent("CallPaused")
+          Call.State.PausedByRemote -> sendEvent("CallPausedByRemote")
+          Call.State.Updating -> sendEvent("CallUpdating")
+          Call.State.UpdatedByRemote -> sendEvent("CallUpdatedByRemote")
+          Call.State.Released -> sendEvent("CallReleased")
+          Call.State.Error -> sendEvent("CallError")
+          Call.State.End -> sendEvent("CallEnd")
+          Call.State.PushIncomingReceived -> sendEvent("CallPushIncomingReceived", null)
+          else -> {}
         }
       }
 
-      override fun onAccountRegistrationStateChanged(core: Core, account: Account, state: RegistrationState?, message: String) {
+      override fun onAccountRegistrationStateChanged(
+        core: Core,
+        account: Account,
+        state: RegistrationState?,
+        message: String
+      ) {
         Log.d(TAG, "[onAccountRegistrationStateChanged] state: $state, message: $message")
+
         val map = Arguments.createMap()
 
         val coreMap = Arguments.createMap()
@@ -228,6 +195,7 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     core.addListener(coreListener)
     promise.resolve(null)
   }
+
 
   @ReactMethod
   fun login(username: String, password: String, domain: String, transportType: Int, promise: Promise) {
