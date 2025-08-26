@@ -380,26 +380,33 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
   }
 
   @ReactMethod
-  fun unregister(promise: Promise) {
-    val account = core.defaultAccount
-    if (account == null) {
-      promise.reject("NoAccount", "No SIP account is currently registered")
-      return
+  public void unregister(Promise promise) {
+    Core core = getCore(); // your existing method to get Linphone Core
+    if (core == null) {
+      promise.reject("CoreError", "SIP Core not initialized");
+      return;
     }
 
-    val params = account.params.clone()
-    params.isRegisterEnabled = false
-    account.params = params
+    Account account = core.getDefaultAccount();
+    if (account == null) {
+      promise.reject("AccountError", "No SIP account to unregister");
+      return;
+    }
 
-    core.refreshRegisters()
+    AccountParams params = account.getParams().clone();
+    params.setRegisterEnabled(false);
+    account.setParams(params);
 
-    Handler(Looper.getMainLooper()).postDelayed({
-      core.removeAccount(account)
-      core.clearAllAuthInfo()
-      promise.resolve(true)
-    }, 1000)
+    // ✅ Triggers REGISTER with Expires: 0
+    core.refreshRegisters();
+
+    // 🕐 Wait 1 second, then optionally clean up
+    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+      core.removeAccount(account);
+      core.clearAllAuthInfo();
+      promise.resolve(true);
+    }, 1000);
   }
-
 
    @ReactMethod
   fun holdCall(promise: Promise) {
@@ -509,5 +516,14 @@ fun setCallOutputVolume(volume: Float, promise: Promise) {
     promise.reject("VolumeError", e.message)
   }
 }
+
+  @ReactMethod
+  public void shutdown(Promise promise) {
+    Core core = getCore();
+    if (core != null) {
+      core.stop();
+    }
+    promise.resolve(true);
+  }
 
 }

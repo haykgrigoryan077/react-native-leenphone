@@ -173,3 +173,7 @@ export async function muteCallAudio(muted: boolean): Promise<void> {
 export async function setCallOutputVolume(volume: number): Promise<void> {
   return Sip.setCallOutputVolume(volume);
 }
+
+export async function shutdown(volume: number): Promise<void> {
+  return Sip.shutdown(volume);
+}
