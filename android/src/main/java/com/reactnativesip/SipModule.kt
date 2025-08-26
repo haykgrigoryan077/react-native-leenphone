@@ -9,6 +9,9 @@ import org.linphone.core.*
 import android.content.Context
 import android.media.AudioManager
 
+import android.os.Handler
+import android.os.Looper
+
 
 class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
   private val context = reactContext.applicationContext
@@ -379,17 +382,24 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
   @ReactMethod
   fun unregister(promise: Promise) {
     val account = core.defaultAccount
-    account ?: return
+    if (account == null) {
+      promise.reject("NoAccount", "No SIP account is currently registered")
+      return
+    }
 
     val params = account.params.clone()
-
     params.isRegisterEnabled = false
     account.params = params
-    core.removeAccount(account)
-    core.clearAllAuthInfo()
 
-    promise.resolve(true)
+    core.refreshRegisters()
+
+    Handler(Looper.getMainLooper()).postDelayed({
+      core.removeAccount(account)
+      core.clearAllAuthInfo()
+      promise.resolve(true)
+    }, 1000)
   }
+
 
    @ReactMethod
   fun holdCall(promise: Promise) {
