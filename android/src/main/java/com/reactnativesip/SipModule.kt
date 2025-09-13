@@ -62,26 +62,26 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
 
 @ReactMethod
 fun answer(promise: Promise) {
-    core.calls.find { it.state == Call.State.IncomingReceived }?.let { call ->
+    core.calls.find { call: Call -> call.state == Call.State.IncomingReceived }?.let { call ->
         try {
-            // CRITICAL: Configure call params before accepting
+            // Configure call params before accepting
             val params = core.createCallParams(call)
             params?.let { p ->
                 p.mediaEncryption = MediaEncryption.None
                 p.isVideoEnabled = false
                 p.isAudioEnabled = true
                 
-                // Force audio codecs that work well with Asterisk
+                // Fix for PCMU codec - use correct API
                 val audioPayloadTypes = core.audioPayloadTypes
-                audioPayloadTypes.find { it.mimeType == "PCMU" }?.let { pcmu ->
-                    p.setAudioPayloadTypes(listOf(pcmu))
+                audioPayloadTypes.find { payloadType: PayloadType -> payloadType.mimeType == "PCMU" }?.let { pcmu ->
+                    p.enablePayloadType(pcmu, true)  // Fixed line 77
                 }
             }
             
-            // Accept with explicit params
+            // Accept with params
             call.acceptWithParams(params)
             
-            // Set audio devices immediately after accept
+            // Set audio devices after accepting
             Handler(Looper.getMainLooper()).postDelayed({
                 core.inputAudioDevice = microphone ?: core.audioDevices.firstOrNull()
                 core.outputAudioDevice = earpiece ?: loudSpeaker ?: core.audioDevices.firstOrNull()
