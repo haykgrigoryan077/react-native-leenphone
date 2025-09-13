@@ -98,18 +98,6 @@ fun initialise(promise: Promise) {
 
     core = factory.createCore(null, null, context)
     
-    // CRITICAL: Configure for Asterisk compatibility
-    core.config.setInt("rtp", "rtcp_enabled", 0)  // Disable RTCP for Asterisk
-    core.config.setInt("rtp", "symmetric", 1)     // Force symmetric RTP
-    core.config.setInt("sip", "rtp_no_xmit_on_audio_mute", 0)
-    
-    // Audio session settings
-    core.config.setInt("sound", "ec_delay", 0)
-    core.config.setInt("sound", "ec_framesize", 128)
-    
-    // Disable session timers that cause 30-sec hangups
-    core.config.setInt("sip", "use_session_timers", 0)
-    
     core.start()
 
     Log.d(TAG, "[initialise] SIP core started")
@@ -194,7 +182,7 @@ fun initialise(promise: Promise) {
     promise.resolve(null)
 }
 
-  @ReactMethod
+@ReactMethod
 fun login(username: String, password: String, domain: String, transportType: Int, promise: Promise) {
     var _transportType = TransportType.Tcp
     if (transportType == 0) { _transportType = TransportType.Udp }
@@ -206,10 +194,8 @@ fun login(username: String, password: String, domain: String, transportType: Int
 
     val accountParams = core.createAccountParams()
 
-    // CRITICAL: Disable session timers that cause 30-sec hangups
-    accountParams.config.setInt("sip", "session_expires", 0)
-    accountParams.config.setInt("sip", "session_min_se", 0)
-
+    // Remove the config calls - they don't exist in this version
+    
     val identity = Factory.instance().createAddress("sip:$username@$domain")
     accountParams.identityAddress = identity
 
@@ -260,10 +246,9 @@ fun configureAudioForIncomingCall(promise: Promise) {
             AudioManager.AUDIOFOCUS_GAIN
         )
         
-        // Scan and set audio devices
-        scanAudioDevices(Arguments.createMap()) { /* empty */ }
+        // Just scan audio devices - remove the extra parameters
+        scanAudioDevices(promise)
         
-        promise.resolve(result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
     } catch (e: Exception) {
         promise.reject("AudioError", e.message)
     }
@@ -291,7 +276,7 @@ fun answer(promise: Promise) {
                 p.mediaEncryption = MediaEncryption.None
                 p.isVideoEnabled = false
                 p.isAudioEnabled = true
-                p.recordFilename = null // Ensure no recording interference
+                // Remove p.recordFilename - this property doesn't exist
             }
             
             // Accept the call
