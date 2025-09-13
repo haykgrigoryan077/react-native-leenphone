@@ -60,40 +60,6 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     Log.d(TAG, "Added listener: $eventName")
   }
 
-@ReactMethod
-fun answer(promise: Promise) {
-    core.calls.find { call: Call -> call.state == Call.State.IncomingReceived }?.let { call ->
-        try {
-            // Configure call params before accepting
-            val params = core.createCallParams(call)
-            params?.let { p ->
-                p.mediaEncryption = MediaEncryption.None
-                p.isVideoEnabled = false
-                p.isAudioEnabled = true
-                
-                // Fix for PCMU codec - use correct API
-                val audioPayloadTypes = core.audioPayloadTypes
-                audioPayloadTypes.find { payloadType: PayloadType -> payloadType.mimeType == "PCMU" }?.let { pcmu ->
-                    p.enablePayloadType(pcmu, true)  // Fixed line 77
-                }
-            }
-            
-            // Accept with params
-            call.acceptWithParams(params)
-            
-            // Set audio devices after accepting
-            Handler(Looper.getMainLooper()).postDelayed({
-                core.inputAudioDevice = microphone ?: core.audioDevices.firstOrNull()
-                core.outputAudioDevice = earpiece ?: loudSpeaker ?: core.audioDevices.firstOrNull()
-            }, 100)
-            
-            promise.resolve(null)
-        } catch (e: Exception) {
-            promise.reject("AnswerError", e.message)
-        }
-    } ?: promise.reject("NoCall", "No incoming call to answer")
-}
-
   @ReactMethod
   fun bluetoothAudio(promise: Promise) {
     if (bluetoothMic != null) {
@@ -124,14 +90,26 @@ fun answer(promise: Promise) {
   }
 
   @ReactMethod
-  fun initialise(promise: Promise) {
+fun initialise(promise: Promise) {
     val factory = Factory.instance()
 
     factory.enableLogCollection(LogCollectionState.Enabled)
-
     factory.setDebugMode(true, "Connected to linphone")
 
     core = factory.createCore(null, null, context)
+    
+    // CRITICAL: Configure for Asterisk compatibility
+    core.config.setInt("rtp", "rtcp_enabled", 0)  // Disable RTCP for Asterisk
+    core.config.setInt("rtp", "symmetric", 1)     // Force symmetric RTP
+    core.config.setInt("sip", "rtp_no_xmit_on_audio_mute", 0)
+    
+    // Audio session settings
+    core.config.setInt("sound", "ec_delay", 0)
+    core.config.setInt("sound", "ec_framesize", 128)
+    
+    // Disable session timers that cause 30-sec hangups
+    core.config.setInt("sip", "use_session_timers", 0)
+    
     core.start()
 
     Log.d(TAG, "[initialise] SIP core started")
@@ -214,11 +192,10 @@ fun answer(promise: Promise) {
 
     core.addListener(coreListener)
     promise.resolve(null)
-  }
-
+}
 
   @ReactMethod
-  fun login(username: String, password: String, domain: String, transportType: Int, promise: Promise) {
+fun login(username: String, password: String, domain: String, transportType: Int, promise: Promise) {
     var _transportType = TransportType.Tcp
     if (transportType == 0) { _transportType = TransportType.Udp }
     if (transportType == 2) { _transportType = TransportType.Tls }
@@ -228,6 +205,10 @@ fun answer(promise: Promise) {
       Factory.instance().createAuthInfo(username, null, password, null, null, domain, null)
 
     val accountParams = core.createAccountParams()
+
+    // CRITICAL: Disable session timers that cause 30-sec hangups
+    accountParams.config.setInt("sip", "session_expires", 0)
+    accountParams.config.setInt("sip", "session_min_se", 0)
 
     val identity = Factory.instance().createAddress("sip:$username@$domain")
     accountParams.identityAddress = identity
@@ -260,7 +241,72 @@ fun answer(promise: Promise) {
         }
       }
     }
-  }
+}
+
+@ReactMethod
+fun configureAudioForIncomingCall(promise: Promise) {
+    try {
+        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        
+        // Configure audio mode before call
+        audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+        audioManager.isSpeakerphoneOn = false
+        audioManager.isMicrophoneMute = false
+        
+        // Request audio focus
+        val result = audioManager.requestAudioFocus(
+            null,
+            AudioManager.STREAM_VOICE_CALL,
+            AudioManager.AUDIOFOCUS_GAIN
+        )
+        
+        // Scan and set audio devices
+        scanAudioDevices(Arguments.createMap()) { /* empty */ }
+        
+        promise.resolve(result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+    } catch (e: Exception) {
+        promise.reject("AudioError", e.message)
+    }
+}
+
+@ReactMethod
+fun answer(promise: Promise) {
+    core.calls.find { call: Call -> call.state == Call.State.IncomingReceived }?.let { call ->
+        try {
+            // CRITICAL: Set audio devices BEFORE accepting
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+            
+            // Set devices immediately
+            core.inputAudioDevice = microphone ?: core.audioDevices.find { 
+                it.type == AudioDevice.Type.Microphone 
+            }
+            core.outputAudioDevice = earpiece ?: core.audioDevices.find { 
+                it.type == AudioDevice.Type.Earpiece 
+            }
+            
+            // Create params with explicit audio settings
+            val params = core.createCallParams(null)
+            params?.let { p ->
+                p.mediaEncryption = MediaEncryption.None
+                p.isVideoEnabled = false
+                p.isAudioEnabled = true
+                p.recordFilename = null // Ensure no recording interference
+            }
+            
+            // Accept the call
+            if (params != null) {
+                call.acceptWithParams(params)
+            } else {
+                call.accept()
+            }
+            
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("AnswerError", e.message)
+        }
+    } ?: promise.reject("NoCall", "No incoming call to answer")
+}
 
   @ReactMethod
   fun loudAudio(promise: Promise) {
@@ -317,7 +363,7 @@ fun answer(promise: Promise) {
   }
 
   @ReactMethod
-  fun scanAudioDevices(promise: Promise) {
+fun scanAudioDevices(promise: Promise) {
     microphone = null
     earpiece = null
     loudSpeaker = null
@@ -360,7 +406,7 @@ fun answer(promise: Promise) {
     result.putString("current", current)
     result.putMap("options", options)
     promise.resolve(result)
-  }
+}
 
   @ReactMethod
   fun sendDtmf(dtmf: String, promise: Promise) {

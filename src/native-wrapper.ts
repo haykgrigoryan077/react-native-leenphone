@@ -177,3 +177,7 @@ export async function setCallOutputVolume(volume: number): Promise<void> {
 export async function shutdown(): Promise<void> {
   return Sip.shutdown();
 }
+
+export async function configureAudioForIncomingCall(): Promise<void> {
+  return Sip.configureAudioForIncomingCall();
+}
