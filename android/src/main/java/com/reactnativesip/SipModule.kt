@@ -60,19 +60,39 @@ class SipModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaMod
     Log.d(TAG, "Added listener: $eventName")
   }
 
-  @ReactMethod
-  fun answer(promise: Promise) {
+@ReactMethod
+fun answer(promise: Promise) {
     core.calls.find { it.state == Call.State.IncomingReceived }?.let { call ->
-      try {
-        call.accept()
-        core.inputAudioDevice = microphone ?: core.audioDevices.firstOrNull()
-        core.outputAudioDevice = earpiece ?: loudSpeaker ?: core.audioDevices.firstOrNull()
-        promise.resolve(null)
-      } catch (e: Exception) {
-        promise.reject("AnswerError", e.message)
-      }
+        try {
+            // CRITICAL: Configure call params before accepting
+            val params = core.createCallParams(call)
+            params?.let { p ->
+                p.mediaEncryption = MediaEncryption.None
+                p.isVideoEnabled = false
+                p.isAudioEnabled = true
+                
+                // Force audio codecs that work well with Asterisk
+                val audioPayloadTypes = core.audioPayloadTypes
+                audioPayloadTypes.find { it.mimeType == "PCMU" }?.let { pcmu ->
+                    p.setAudioPayloadTypes(listOf(pcmu))
+                }
+            }
+            
+            // Accept with explicit params
+            call.acceptWithParams(params)
+            
+            // Set audio devices immediately after accept
+            Handler(Looper.getMainLooper()).postDelayed({
+                core.inputAudioDevice = microphone ?: core.audioDevices.firstOrNull()
+                core.outputAudioDevice = earpiece ?: loudSpeaker ?: core.audioDevices.firstOrNull()
+            }, 100)
+            
+            promise.resolve(null)
+        } catch (e: Exception) {
+            promise.reject("AnswerError", e.message)
+        }
     } ?: promise.reject("NoCall", "No incoming call to answer")
-  }
+}
 
   @ReactMethod
   fun bluetoothAudio(promise: Promise) {
